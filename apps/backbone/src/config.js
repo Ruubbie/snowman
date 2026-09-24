@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
  * @property {string|undefined} anthropicWorkspaceId
  * @property {string} olafModelFast
  * @property {string} olafModelSmart
+ * @property {string} olafModelWriter model for Olaf's pre-recorded run lines: written once per workout, so worth the best
  * @property {number} aiMonthlyBudgetUsd
  * @property {string|undefined} personaFile
  */
@@ -52,6 +53,7 @@ export function loadConfig(env = process.env) {
     anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID || undefined,
     olafModelFast: env.OLAF_MODEL_FAST || 'claude-haiku-4-5',
     olafModelSmart: env.OLAF_MODEL_SMART || 'claude-sonnet-5',
+    olafModelWriter: env.OLAF_MODEL_WRITER || 'claude-opus-5-5',
     aiMonthlyBudgetUsd,
     personaFile: env.PERSONA_FILE || undefined,
     corsOrigins: env.CORS_ORIGINS || 'http://localhost:8081',

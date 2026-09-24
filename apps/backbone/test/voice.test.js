@@ -381,18 +381,21 @@ test('POST /v1/running/brief returns deterministic audio ids for the spoken line
     focus: ['easy'],
     opening_line: "Let's go, easy start.",
     targets: [],
-    fallback_lines: {
-      too_fast: 'Slow down.',
-      too_slow: 'Pick it up.',
-      to_run: 'Run!',
-      to_walk: 'Walk.',
-      km_split: 'Another km.',
+    switches: ['Run!', 'Walk.'],
+    lines: {
+      too_fast: ['Slow down.', 'Easy now.'],
+      too_slow: ['Pick it up.'],
+      km_split: ['Another km.'],
+      encourage: ['Go you.'],
       halfway: 'Halfway.',
       finish: 'Done!',
-      encourage: 'Go you.',
+      paused: 'Paused.',
+      resumed: 'Off again.',
+      gps_lost: 'Lost you.',
     },
   };
-  const session = { id: 's1', date: '2026-02-02', kind: 'run', title: 'Run', summary: 's', segments: [], status: 'planned' };
+  const segments = [{ kind: 'walk', seconds: 60 }, { kind: 'run', seconds: 60 }, { kind: 'walk', seconds: 60 }];
+  const session = { id: 's1', date: '2026-02-02', kind: 'run', title: 'Run', summary: 's', segments, status: 'planned' };
   const runningRepo = {
     async getSessionById() { return session; },
     async getSettings() { return {}; },
@@ -406,8 +409,12 @@ test('POST /v1/running/brief returns deterministic audio ids for the spoken line
   assert.equal(res.statusCode, 200);
   const { audio } = res.json();
   assert.equal(audio.opening_line.id, engine.idFor(brief.opening_line));
-  assert.deepEqual(Object.keys(audio.fallback_lines).sort(), Object.keys(brief.fallback_lines).sort());
   assert.equal(audio.fallback_lines.too_fast.url, `/v1/voice/audio/${engine.idFor('Slow down.')}.wav`);
+  assert.equal(audio.fallback_lines.to_run.url, `/v1/voice/audio/${engine.idFor('Run!')}.wav`);
+  // Every variant gets a clip, in the order they're heard.
+  assert.equal(audio.clips['Easy now.'], `/v1/voice/audio/${engine.idFor('Easy now.')}.wav`);
+  assert.equal(audio.clips['Lost you.'], `/v1/voice/audio/${engine.idFor('Lost you.')}.wav`);
+  assert.deepEqual(Object.keys(audio.clips).slice(0, 3), ["Let's go, easy start.", 'Run!', 'Walk.']);
 
   // Background jobs finish; each line synthesised exactly once.
   const clip = await app.inject({ method: 'GET', url: audio.fallback_lines.encourage.url, headers: AUTH });

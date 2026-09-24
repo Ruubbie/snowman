@@ -524,14 +524,17 @@ export function BriefBody({ brief }) {
           ))}
         </div>
       )}
-      {b.fallback_lines && (
+      {(b.lines || b.fallback_lines) && (
         <details>
           <summary className="link-btn" style={{ listStyle: 'none' }}>
-            Fallback lines
+            Everything I'll say
           </summary>
           <dl className="kv" style={{ marginTop: 12 }}>
-            {Object.entries(b.fallback_lines).map(([k, v]) => (
-              <FragmentKV key={k} k={k.replace(/_/g, ' ')} v={v} />
+            {Object.entries(b.switch_lines || {}).map(([i, v]) => (
+              <FragmentKV key={`s${i}`} k={`switch to part ${Number(i) + 1}`} v={v} />
+            ))}
+            {Object.entries(b.lines || b.fallback_lines).map(([k, v]) => (
+              <FragmentKV key={k} k={k.replace(/_/g, ' ')} v={Array.isArray(v) ? v.join('  ·  ') : v} />
             ))}
           </dl>
         </details>

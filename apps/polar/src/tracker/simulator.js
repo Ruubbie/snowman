@@ -55,7 +55,18 @@ export function prefetch() {}
 
 let runState = null;
 
+const LINE_KEY = { too_fast: 'too_fast', too_slow: 'too_slow', km_split: 'km_split', halfway: 'halfway', finish: 'finish', checkin: 'encourage', slowing: 'encourage' };
+
 function fallbackLineFor(trigger, brief) {
+  // The brief's variants in turn, like the native cue engine.
+  const key = LINE_KEY[trigger];
+  const set = key && brief?.lines?.[key];
+  if (Array.isArray(set) && set.length) {
+    runState.timesSaid[key] = (runState.timesSaid[key] || 0) + 1;
+    const n = runState.timesSaid[key] - 1;
+    // One line per kilometre; the last one (no number in it) repeats after that.
+    return key === 'km_split' ? set[Math.min(n, set.length - 1)] : set[n % set.length];
+  }
   const lines = brief?.fallback_lines || {};
   switch (trigger) {
     case 'too_fast':
@@ -115,7 +126,7 @@ async function handleTrigger(fired, snapshot) {
 
   if (trigger === 'segment_upcoming') {
     const kind = brief?.targets?.[segmentIndex]?.kind || runState.segments[segmentIndex]?.kind;
-    const fallback = kind === 'walk' ? brief?.fallback_lines?.to_walk : brief?.fallback_lines?.to_run;
+    const fallback = brief?.switch_lines?.[segmentIndex] || (kind === 'walk' ? brief?.fallback_lines?.to_walk : brief?.fallback_lines?.to_run);
     if (phase === 'request') {
       const say = await requestOlafLine('segment_upcoming', snapshot);
       if (say) {
@@ -167,6 +178,7 @@ export function start({ sessionId, runClientId, segments = [], brief } = {}) {
     segments,
     brief,
     engine,
+    timesSaid: {},
     state: 'running',
     elapsedS: 0,
     distanceM: 0,

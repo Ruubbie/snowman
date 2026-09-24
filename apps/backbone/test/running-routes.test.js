@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildApp } from '../src/app.js';
 import { sha256Hex } from '../src/core/auth.js';
+import { normalizeBrief } from '../../../packages/modules/running/src/routes.js';
 
 const TEST_TOKEN = 'test-token-1234567890';
 const BASE_CONFIG = {
@@ -99,22 +100,57 @@ test('POST /v1/running/brief returns Olaf structured output and stores it', asyn
     kind: 'run',
     title: 'Week 1 Run',
     summary: 's',
-    segments: [],
+    segments: [
+      { kind: 'walk', seconds: 300 },
+      { kind: 'run', seconds: 240 },
+      { kind: 'walk', seconds: 60 },
+      { kind: 'run', seconds: 240 },
+      { kind: 'walk', seconds: 300 },
+    ],
     status: 'planned',
     source: 'program',
     programWeek: 1,
   });
 
-  const briefJson = {
+  const answer = {
     focus: ['pace'],
     opening_line: "Let's go!",
-    targets: [{ segment_index: 0, kind: 'run', pace_min_s_per_km: 300, pace_max_s_per_km: 360, feel: 'easy' }],
+    targets: [{ segment_index: 1, kind: 'run', pace_min_s_per_km: 300, pace_max_s_per_km: 360, feel: 'easy' }],
+    switches: ['Run one!', 'Walk a minute.', 'Last run!', 'All done running.'],
+    lines: {
+      too_fast: ['slow down', 'easy there', 'whoa'],
+      too_slow: ['pick it up'],
+      km_split: ['a kilometre', 'another'],
+      encourage: ['go you'],
+      halfway: 'halfway',
+      finish: 'finish',
+      paused: 'paused',
+      resumed: 'back on',
+      gps_lost: 'no gps',
+    },
+  };
+  const briefJson = {
+    focus: answer.focus,
+    opening_line: answer.opening_line,
+    targets: answer.targets,
+    lines: {
+      too_fast: ['slow down', 'easy there', 'whoa'],
+      too_slow: ['pick it up'],
+      km_split: ['a kilometre', 'another'],
+      encourage: ['go you'],
+      halfway: ['halfway'],
+      finish: ['finish'],
+      paused: ['paused'],
+      resumed: ['back on'],
+      gps_lost: ['no gps'],
+    },
+    switch_lines: { 1: 'Run one!', 2: 'Walk a minute.', 3: 'Last run!', 4: 'All done running.' },
     fallback_lines: {
       too_fast: 'slow down',
       too_slow: 'pick it up',
-      to_run: 'run',
-      to_walk: 'walk',
-      km_split: 'split',
+      to_run: 'Run one!',
+      to_walk: 'Walk a minute.',
+      km_split: 'a kilometre',
       halfway: 'halfway',
       finish: 'finish',
       encourage: 'go you',
@@ -122,7 +158,7 @@ test('POST /v1/running/brief returns Olaf structured output and stores it', asyn
   };
   const brain = fakeBrainWith({
     stop_reason: 'end_turn',
-    content: [{ type: 'text', text: JSON.stringify(briefJson) }],
+    content: [{ type: 'text', text: JSON.stringify(answer) }],
     usage: { input_tokens: 10, output_tokens: 10 },
   });
 
@@ -139,6 +175,10 @@ test('POST /v1/running/brief returns Olaf structured output and stores it', asyn
   assert.equal(body.sessionId, sessionId);
   assert.deepEqual(body.brief, briefJson);
   assert.deepEqual(runningRepo.briefs.get(sessionId).brief, briefJson);
+  // The prompt lays out every switch so each line fits its place.
+  const prompt = brain.calls[0].messages[0].content;
+  assert.match(prompt, /exactly 4 lines/);
+  assert.match(prompt, /run 2 of 2, the last one/);
 
   // Same inputs again (e.g. the Today screen refreshing): stored brief, no second Olaf call.
   const again = await app.inject({
@@ -249,8 +289,9 @@ const BRIEF = {
   focus: ['easy'],
   opening_line: 'Off we go.',
   targets: [],
-  fallback_lines: {
-    too_fast: 'a', too_slow: 'b', to_run: 'c', to_walk: 'd', km_split: 'e', halfway: 'f', finish: 'g', encourage: 'h',
+  switches: [],
+  lines: {
+    too_fast: ['a'], too_slow: ['b'], km_split: ['e'], encourage: ['h'], halfway: 'f', finish: 'g', paused: 'p', resumed: 'r', gps_lost: 'x',
   },
 };
 
@@ -274,7 +315,7 @@ test('a brief is written once per workout: the same workout on another day reuse
   assert.equal((await post('a')).statusCode, 200);
   const b = await post('b');
   assert.equal(b.json().cached, true);
-  assert.deepEqual(b.json().brief, BRIEF);
+  assert.deepEqual(b.json().brief, normalizeBrief(BRIEF, session('b', '2026-02-05')));
   assert.equal(brain.calls.length, 1);
   await post('c'); // different segments: a new brief
   assert.equal(brain.calls.length, 2);

@@ -272,6 +272,17 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
       finish: fb?["finish"] as? String ?? "",
       encourage: fb?["encourage"] as? String ?? ""
     )
+    var switchLines: [Int: String] = [:]
+    for (key, value) in (brief?["switch_lines"] as? [String: Any]) ?? [:] {
+      if let index = intValue(key), let line = value as? String { switchLines[index] = line }
+    }
+    cues.switchLines = switchLines
+    var lineSets: [String: [String]] = [:]
+    for (key, value) in (brief?["lines"] as? [String: Any]) ?? [:] {
+      let set = (value as? [Any])?.compactMap { $0 as? String } ?? [value as? String].compactMap { $0 }
+      if !set.isEmpty { lineSets[key] = set }
+    }
+    cues.lineSets = lineSets
     prefetchClips(from: brief)
   }
 
@@ -283,6 +294,9 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     if let text = brief?["opening_line"] as? String,
       let path = (audio?["opening_line"] as? [String: Any])?["url"] as? String {
       clipPaths[text] = path
+    }
+    for (text, value) in (audio?["clips"] as? [String: Any]) ?? [:] {
+      if let path = value as? String { clipPaths[text] = path }
     }
     let fbAudio = audio?["fallback_lines"] as? [String: Any]
     for (key, value) in (brief?["fallback_lines"] as? [String: Any]) ?? [:] {
@@ -350,7 +364,7 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
       segmentIndex = idx
       let seg = segments[idx]
       recordEvent(type: "segment_start", data: ["index": idx, "kind": seg.kind])
-      cues.announceSegmentSwitch(nextKind: seg.kind, snapshot: snapshotWithPlannedTotal(buildSnapshot()))
+      cues.announceSegmentSwitch(nextIndex: idx, nextKind: seg.kind, snapshot: snapshotWithPlannedTotal(buildSnapshot()))
       liveActivity.update(
         segmentKind: seg.kind, segmentIndex: idx,
         segmentEndsAt: Date().addingTimeInterval(segmentRemainingS()),

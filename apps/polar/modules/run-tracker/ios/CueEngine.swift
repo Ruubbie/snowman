@@ -34,6 +34,10 @@ final class CueEngine {
   var openingLine: String?
   var targets: [CueTarget] = []
   var fallback: CueFallbackLines?
+  /// The brief's line for each run/walk switch, by the segment that starts.
+  var switchLines: [Int: String] = [:]
+  /// The brief's variants per moment ("km_split": [...]), said in turn.
+  var lineSets: [String: [String]] = [:]
 
   /// Fired for every cue actually spoken (live or fallback).
   var onCue: ((_ text: String, _ trigger: String, _ source: String) -> Void)?
@@ -52,6 +56,8 @@ final class CueEngine {
   private var firedOnce = Set<String>()
   private var lastKmSplitS: [Int: Double] = [:]
   private var lastElapsedS: Double = 0
+  private var timesSaid: [String: Int] = [:]
+  private var lastKm = 0
 
   private var prefetchedSay: String?
   private var prefetchedForSegmentIndex: Int?
@@ -71,6 +77,8 @@ final class CueEngine {
     firedOnce.removeAll()
     lastKmSplitS.removeAll()
     lastFallbackSpokenAt.removeAll()
+    timesSaid.removeAll()
+    lastKm = 0
     prefetchedSay = nil
     prefetchedForSegmentIndex = nil
     inFlight = false
@@ -146,6 +154,7 @@ final class CueEngine {
   // MARK: - Discrete moments
 
   func onKmSplit(km: Int, splitS: Double, segmentKind: String, snapshot: [String: Any]) {
+    lastKm = km
     trigger("km_split", snapshot: snapshot)
     if let prev = lastKmSplitS[km - 1], segmentKind == "run", splitS - prev > 30 {
       trigger("slowing", snapshot: snapshot)
@@ -170,6 +179,7 @@ final class CueEngine {
   /// in flight (the one exception to the single-in-flight rule).
   func prefetchSegmentSwitch(nextIndex: Int, snapshot: [String: Any]) {
     // The brief's pre-made switch lines are used instead (Olaf's own voice).
+    if switchLines[nextIndex] != nil { return }
     if !(fallback?.toRun ?? "").isEmpty && !(fallback?.toWalk ?? "").isEmpty { return }
     guard prefetchedForSegmentIndex != nextIndex else { return }
     prefetchedForSegmentIndex = nextIndex
@@ -182,8 +192,10 @@ final class CueEngine {
 
   /// Speak the segment switch, live if the prefetch already landed, else the
   /// brief's fallback line immediately - a switch must always be announced.
-  func announceSegmentSwitch(nextKind: String, snapshot: [String: Any]) {
-    if let say = prefetchedSay, !say.isEmpty {
+  func announceSegmentSwitch(nextIndex: Int, nextKind: String, snapshot: [String: Any]) {
+    if let line = switchLines[nextIndex], !line.isEmpty {
+      speakLocal(line, trigger: "segment_upcoming", source: "fallback")
+    } else if let say = prefetchedSay, !say.isEmpty {
       speakLocal(say, trigger: "segment_upcoming", source: "live")
     } else {
       let line = nextKind == "walk" ? fallback?.toWalk : fallback?.toRun
@@ -267,10 +279,23 @@ final class CueEngine {
     let now = Date()
     if let last = lastFallbackSpokenAt[triggerName], now.timeIntervalSince(last) < 180 { return }
     lastFallbackSpokenAt[triggerName] = now
+    if let key = Self.lineKey[triggerName] { timesSaid[key, default: 0] += 1 }
     speakLocal(line, trigger: triggerName, source: "fallback")
   }
 
+  private static let lineKey = [
+    "too_fast": "too_fast", "too_slow": "too_slow", "km_split": "km_split", "halfway": "halfway",
+    "finish": "finish", "checkin": "encourage", "slowing": "encourage",
+    "paused": "paused", "resumed": "resumed", "gps_lost": "gps_lost",
+  ]
+
+  /// The next line for a moment: the brief's variants in turn, else the single fallback.
   private func fallbackLine(for triggerName: String) -> String? {
+    if let key = Self.lineKey[triggerName], let set = lineSets[key], !set.isEmpty {
+      // One line per kilometre; the last one (no number in it) repeats after that.
+      if key == "km_split" { return set[min(max(lastKm, 1), set.count) - 1] }
+      return set[timesSaid[key, default: 0] % set.count]
+    }
     switch triggerName {
     case "too_fast": return fallback?.tooFast
     case "too_slow": return fallback?.tooSlow

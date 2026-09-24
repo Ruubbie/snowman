@@ -7,6 +7,7 @@
 export const PRICE_TABLE = {
   'claude-haiku-4-5': { inputPerM: 1, outputPerM: 5 },
   'claude-sonnet-5': { inputPerM: 2, outputPerM: 10 },
+  'claude-opus-5-5': { inputPerM: 5, outputPerM: 25 },
 };
 
 const CACHE_READ_MULTIPLIER = 0.1;

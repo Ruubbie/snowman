@@ -8,13 +8,31 @@ import { analyzeRun } from './analysis.js';
 
 const BODY_LIMIT_20MB = 20 * 1024 * 1024;
 
+/** How Olaf talks out loud during a workout; shared by the brief and live cues. */
+const SPOKEN_STYLE = `How it has to sound:
+- Spoken, not written. You're jogging along in their ear, so talk like it: short sentences, contractions, plain words. Most in-run lines are 3 to 12 words; some are just two or three.
+- Numbers the way people say them, in words: "about seven minutes a kilometre", "four minutes", "the last one". Round paces to the nearest half minute. Never a range like "6:30 to 7:30", never "per km", never digits.
+- Unmistakably you. Most lines are things only a delighted little snowman would say: wonder at small real things you notice, your "Oh!" and "Ooh!" and "Wait, wait!", taking something literally, a snowman aside. Find your own; don't reuse the persona's example lines. A few lines stay plain and quiet for contrast, like a real person. A line any running app could say is a wasted line.
+- Never generic coach or fitness app talk. Banned: "you've got this", "you're doing great", "in the books", "crush it", "keep it up", "keep that going", "great work", "great job", "one step at a time", "listen to your body", "that's the spirit", "nice and steady", "save your legs", and anything that belongs on a poster.
+- No dashes, lists, emoji, stage directions, sound effects or quotes from the Frozen films.`;
+
 const STABLE_BRIEF_INSTRUCTIONS =
-  'You are writing a pre-run brief for a beginner runner using an iPhone with no heart-rate monitor - only ' +
-  'GPS pace and time are available. Write lines specifically for THIS run: no generic templates. Return only ' +
-  'the requested JSON.';
+  `You are Olaf. Soon you'll be in the runner's ear for this workout: earbuds in, phone in a pocket, no ` +
+  `heart-rate data, only GPS pace and time. Write everything you'll say during it. Each line is recorded in ` +
+  `your own voice ahead of time and played word for word at its moment, so it has to sound like you talking ` +
+  `to a friend, not like an app reading a notification.
+
+${SPOKEN_STYLE}
+- Every moment knows where it is: how long this part lasts, how far into the workout it falls, what comes ` +
+  `next. The last run knows it's the last. The fourth walk break doesn't sound like the first.
+- Variants of the same moment are different sentences with a different feel, not the same sentence reworded.
+- These lines may be reused on a later day for the same workout, so never mention specific days ("yesterday", ` +
+  `"Tuesday") or specific past runs.
+
+Return only the requested JSON.`;
 const STABLE_CUE_INSTRUCTIONS =
   'You are Olaf, speaking a short live cue out loud to a beginner runner mid-run, on an iPhone with no ' +
-  'heart-rate data. Max ~20 words. Use concrete numbers when useful. Never repeat a recent cue verbatim. ' +
+  `heart-rate data.\n\n${SPOKEN_STYLE}\n- Never repeat a recent cue or its idea.\n\n` +
   'Return only the requested JSON; say may be null to stay silent.';
 const STABLE_DEBRIEF_INSTRUCTIONS =
   'You are Olaf, giving a short honest debrief right after a run, to a beginner runner on an iPhone with no ' +
@@ -81,19 +99,144 @@ export function buildReminderSpecs(sessions, settings, tzName) {
   return specs.slice(0, 42);
 }
 
+function spokenMinutes(seconds) {
+  if (seconds < 60) return `${seconds} seconds`;
+  const m = Math.round(seconds / 6) / 10;
+  return `${m} minute${m === 1 ? '' : 's'}`;
+}
+
+/**
+ * The moments a workout switches between running and walking: every segment
+ * after the first. [{segment_index, kind, seconds, runNumber?, runsTotal}]
+ */
+export function workoutSwitches(segments = []) {
+  const runsTotal = segments.filter((s) => s.kind === 'run').length;
+  let runNumber = 0;
+  const out = [];
+  segments.forEach((s, i) => {
+    if (s.kind === 'run') runNumber += 1;
+    if (i === 0) return;
+    out.push({ segment_index: i, kind: s.kind, seconds: s.seconds || 0, runNumber: s.kind === 'run' ? runNumber : null, runsTotal, runsDone: s.kind === 'run' ? runNumber - 1 : runNumber });
+  });
+  return out;
+}
+
+function workoutOutline(session) {
+  const segments = session.segments || [];
+  const total = segments.reduce((t, s) => t + (s.seconds || 0), 0);
+  const switches = workoutSwitches(segments);
+  const rows = segments.map((s, i) => {
+    const sw = switches.find((x) => x.segment_index === i);
+    let note = '';
+    if (i === 0) note = ' (the start: your opening line plays here)';
+    else if (sw.kind === 'run') note = ` (switch ${switches.indexOf(sw) + 1}: run ${sw.runNumber} of ${sw.runsTotal}${sw.runNumber === sw.runsTotal ? ', the last one' : ''})`;
+    else if (i === segments.length - 1) note = ` (switch ${switches.indexOf(sw) + 1}: the cool-down walk, all running done)`;
+    else note = ` (switch ${switches.indexOf(sw) + 1}: walk break after run ${sw.runsDone})`;
+    return `${i}. ${s.kind} for ${spokenMinutes(s.seconds || 0)}${note}`;
+  });
+  // Where the halfway line lands, so it doesn't miscount what's left.
+  let at = 0;
+  let halfway = '';
+  segments.forEach((s, i) => {
+    if (!halfway && at + (s.seconds || 0) >= total / 2) {
+      const into = Math.round(total / 2 - at);
+      halfway = `\nHalfway (${spokenMinutes(Math.round(total / 2))} in) falls ${into ? `${spokenMinutes(into)} into` : 'at the start of'} part ${i} (${s.kind}).`;
+    }
+    at += s.seconds || 0;
+  });
+  return { text: `${rows.join('\n')}\nTotal: ${spokenMinutes(total)}.${halfway}`, switchCount: switches.length };
+}
+
+/** Rough kilometres a workout covers: running at their recent pace (or 7:30), walking at 10:30. */
+export function estimateKm(segments = [], recentRuns = []) {
+  const paces = recentRuns.map((r) => r.avgPaceSPerKm).filter((p) => p > 0 && p < 600);
+  const runPace = paces.length ? paces.reduce((a, b) => a + b, 0) / paces.length : 450;
+  const m = segments.reduce((t, s) => t + ((s.seconds || 0) * 1000) / (s.kind === 'run' ? runPace : 630), 0);
+  return Math.max(1, Math.round(m / 1000));
+}
+
 function buildBriefPrompt(session, settings, recentRuns, recentDecisions) {
+  const { text: outline, switchCount } = workoutOutline(session);
+  const recentPaces = recentRuns
+    .filter((r) => r.avgPaceSPerKm)
+    .map((r) => ({ distanceM: r.distanceM, durationS: r.durationS, avgPaceSPerKm: r.avgPaceSPerKm }));
+  const km = estimateKm(session.segments, recentRuns);
   return [
-    `Today's session: ${JSON.stringify(session)}`,
+    `The workout: "${session.title}" (${session.kind}). ${session.summary || ''}`.trim(),
+    `In order:\n${outline}`,
+    `Recent runs, only to set sensible paces: ${JSON.stringify(recentPaces)}`,
     `Runner settings: ${JSON.stringify(settings)}`,
-    `Last ${recentRuns.length} runs: ${JSON.stringify(recentRuns)}`,
     `Recent plan decisions: ${JSON.stringify(recentDecisions)}`,
-    'Write a pre-run brief as the required JSON: focus points, an opening line, per-segment pace targets ' +
-      '(segment_index/kind/pace_min_s_per_km/pace_max_s_per_km/feel), and fallback_lines for ' +
-      'too_fast/too_slow/to_run/to_walk/km_split/halfway/finish/encourage. Lines must be specific to this run.',
-    'The fallback lines are recorded in advance and played word for word at those moments during the run, ' +
-      'so they are all the runner hears: use the planned paces and durations from the targets (e.g. "aim for 6:30 per ' +
-      'kilometre", "one minute of walking"), never numbers you cannot know in advance like the actual split.',
+    [
+      'Write the JSON:',
+      '- focus: two or three short things to keep in mind today, shown on screen before the start.',
+      '- opening_line: what you say as they press start. Two or three short spoken sentences: what today is, and the one thing that matters.',
+      '- targets: a pace range per segment (segment_index, kind, pace_min_s_per_km, pace_max_s_per_km, feel). Null paces for a segment with no target.',
+      switchCount
+        ? `- switches: exactly ${switchCount} lines, one per switch above, in that order. Each plays the second that part starts, so it's already happening (never "coming up"): tell them what starts now and for how long, in your own words, and let it fit its place in the workout.`
+        : '- switches: an empty array (this workout has no switches).',
+      '- lines.too_fast: 3 different lines for when they go faster than the target for a while.',
+      '- lines.too_slow: 3 different lines for when they drop below the target pace.',
+      `- lines.km_split: one line per finished kilometre, in order: the first plays at 1 km, the second at 2 km and so on. ` +
+        `This workout covers roughly ${km} km, so write ${km + 1} lines. The last one plays again for every kilometre ` +
+        `after that, so it must not name a number. You can't know the split time, so don't guess one.`,
+      '- lines.encourage: 4 different lines for a check-in every few minutes when nothing else is happening.',
+      '- lines.halfway, lines.finish: one line each. Finish plays when the planned time is up.',
+      '- lines.paused, lines.resumed: one short line each for when they pause and continue.',
+      '- lines.gps_lost: one short line for when the phone loses GPS for a bit.',
+    ].join('\n'),
   ].join('\n\n');
+}
+
+/**
+ * The stored brief: the AI's answer plus `switch_lines` ({segment_index:
+ * line}) and plain `fallback_lines` (one line per moment) for app builds that
+ * predate the variants.
+ */
+export function normalizeBrief(data, session) {
+  const switches = workoutSwitches(session.segments || []);
+  const said = (Array.isArray(data.switches) ? data.switches : []).filter((t) => typeof t === 'string' && t.trim());
+  const switch_lines = {};
+  switches.forEach((sw, n) => {
+    if (said[n]) switch_lines[sw.segment_index] = said[n];
+  });
+  const lines = {};
+  for (const [key, value] of Object.entries(data.lines || {})) {
+    const list = (Array.isArray(value) ? value : [value]).filter((t) => typeof t === 'string' && t.trim());
+    if (list.length) lines[key] = list;
+  }
+  const first = (key) => lines[key]?.[0] || '';
+  const firstSwitch = (kind) => switches.map((sw) => sw.kind === kind && switch_lines[sw.segment_index]).find(Boolean) || '';
+  const { switches: _drop, ...rest } = data;
+  return {
+    ...rest,
+    lines,
+    switch_lines,
+    fallback_lines: {
+      too_fast: first('too_fast'),
+      too_slow: first('too_slow'),
+      to_run: firstSwitch('run'),
+      to_walk: firstSwitch('walk'),
+      km_split: first('km_split'),
+      halfway: first('halfway'),
+      finish: first('finish'),
+      encourage: first('encourage'),
+    },
+  };
+}
+
+/** Every line of a brief Olaf may say, opening and switches first, no duplicates. */
+export function briefLines(brief) {
+  if (!brief) return [];
+  const all = [
+    brief.opening_line,
+    ...Object.keys(brief.switch_lines || {})
+      .sort((a, b) => a - b)
+      .map((k) => brief.switch_lines[k]),
+    ...Object.values(brief.lines || {}).flat(),
+    ...Object.values(brief.fallback_lines || {}),
+  ];
+  return [...new Set(all.filter((t) => typeof t === 'string' && t.trim()))];
 }
 
 function buildCuePrompt(trigger, snapshot, recentCues) {
@@ -117,7 +260,7 @@ function buildDebriefPrompt(run, session, analysis) {
 const BRIEF_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['focus', 'opening_line', 'targets', 'fallback_lines'],
+  required: ['focus', 'opening_line', 'targets', 'switches', 'lines'],
   properties: {
     focus: { type: 'array', items: { type: 'string' } },
     opening_line: { type: 'string' },
@@ -136,19 +279,21 @@ const BRIEF_SCHEMA = {
         },
       },
     },
-    fallback_lines: {
+    switches: { type: 'array', items: { type: 'string' } },
+    lines: {
       type: 'object',
       additionalProperties: false,
-      required: ['too_fast', 'too_slow', 'to_run', 'to_walk', 'km_split', 'halfway', 'finish', 'encourage'],
+      required: ['too_fast', 'too_slow', 'km_split', 'encourage', 'halfway', 'finish', 'paused', 'resumed', 'gps_lost'],
       properties: {
-        too_fast: { type: 'string' },
-        too_slow: { type: 'string' },
-        to_run: { type: 'string' },
-        to_walk: { type: 'string' },
-        km_split: { type: 'string' },
+        too_fast: { type: 'array', items: { type: 'string' } },
+        too_slow: { type: 'array', items: { type: 'string' } },
+        km_split: { type: 'array', items: { type: 'string' } },
+        encourage: { type: 'array', items: { type: 'string' } },
         halfway: { type: 'string' },
         finish: { type: 'string' },
-        encourage: { type: 'string' },
+        paused: { type: 'string' },
+        resumed: { type: 'string' },
+        gps_lost: { type: 'string' },
       },
     },
   },
@@ -166,18 +311,23 @@ const CUE_SCHEMA = {
  * and return their deterministic audio ids/urls right away. null when the
  * server voice is off/unavailable - the phone then uses on-device speech.
  * @param {{enqueue: (text: string, o?: object) => ({id: string, url: string}|null)}|undefined} voice
+ * `clips` maps every line's text to its audio url, for the phone to download.
  * @param {{opening_line?: string, fallback_lines?: Record<string, string>}} brief
  */
 export function briefAudio(voice, brief) {
   if (!voice?.enabled || !brief) return null;
-  // Opening line first: it is the first thing the runner hears.
-  const opening_line = typeof brief.opening_line === 'string' ? voice.enqueue(brief.opening_line) : null;
-  const fallback_lines = {};
-  for (const [key, text] of Object.entries(brief.fallback_lines || {})) {
-    fallback_lines[key] = typeof text === 'string' ? voice.enqueue(text) : null;
+  // In the order they're heard: the opening line first.
+  const made = new Map();
+  for (const text of briefLines(brief)) {
+    const clip = voice.enqueue(text);
+    if (clip) made.set(text, clip);
   }
-  if (!opening_line && Object.values(fallback_lines).every((v) => !v)) return null;
-  return { opening_line, fallback_lines };
+  if (!made.size) return null;
+  const at = (text) => made.get(text) || null;
+  const fallback_lines = {};
+  for (const [key, text] of Object.entries(brief.fallback_lines || {})) fallback_lines[key] = at(text);
+  const clips = Object.fromEntries([...made].map(([text, clip]) => [text, clip.url]));
+  return { opening_line: at(brief.opening_line), fallback_lines, clips };
 }
 
 const CUE_TRIGGERS = [
@@ -194,6 +344,8 @@ const CUE_TRIGGERS = [
   'gps_lost',
 ];
 
+/** Bump when the brief's shape or prompt changes, so every workout gets rewritten once. */
+const BRIEF_VERSION = 'brief-2';
 /** How far ahead Olaf writes briefs and records their lines. */
 const PREPARE_DAYS = 3;
 /** Opening the app re-checks the next days at most this often. */
@@ -208,10 +360,14 @@ function preparable(session) {
  * So a brief is written once per workout, and a skipped workout's lines (and
  * their recorded voice) are reused the next time the same workout comes up.
  */
+function briefModel(ctx) {
+  return ctx.config.olafModelWriter || ctx.config.olafModelSmart;
+}
+
 function briefInputHash(ctx, session) {
   const workout = { kind: session.kind, title: session.title, summary: session.summary, segments: session.segments };
   return createHash('sha256')
-    .update([ctx.config.olafModelSmart, ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, JSON.stringify(workout)].join('\n'))
+    .update([BRIEF_VERSION, briefModel(ctx), ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, JSON.stringify(workout)].join('\n'))
     .digest('hex');
 }
 
@@ -255,11 +411,12 @@ export function createRunningShared(ctx, log = console) {
     const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
     const { data } = await ctx.brainAgent.structured(
       { brain: ctx.brain, budget: ctx.budget, purpose: 'running.brief' },
-      { model: ctx.config.olafModelSmart, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 2000 },
+      { model: briefModel(ctx), systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 8000 },
       BRIEF_SCHEMA,
     );
-    await repo.insertBrief(session.id, data, ctx.config.olafModelSmart, inputHash);
-    return { brief: data, cached: false };
+    const brief = normalizeBrief(data, session);
+    await repo.insertBrief(session.id, brief, briefModel(ctx), inputHash);
+    return { brief, cached: false };
   }
 
   let preparing = null;
@@ -303,7 +460,7 @@ export function createRunningShared(ctx, log = console) {
 /** How many of a brief's lines are already recorded in Olaf's voice: {ready, total}. */
 function voiceProgress(voice, brief) {
   if (!voice?.enabled || !brief || typeof voice.has !== 'function') return null;
-  const lines = [brief.opening_line, ...Object.values(brief.fallback_lines || {})].filter((t) => typeof t === 'string' && t);
+  const lines = briefLines(brief);
   return { ready: lines.filter((t) => voice.has(t)).length, total: lines.length };
 }
 
