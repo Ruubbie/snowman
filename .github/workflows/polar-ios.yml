@@ -54,7 +54,7 @@ jobs:
       - name: Build (unsigned; SideStore signs it on your phone)
         working-directory: apps/polar/ios
         run: |
-          set -uo pipefail
+          set +e -uo pipefail  # the runner starts bash with -e; keep going so errors can be reported
           xcodebuild \
             -workspace Polar.xcworkspace \
             -scheme Polar \
