@@ -18,11 +18,18 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # Expo SDK 57 needs Xcode 26+ (ExpoModulesJSI xcframework prebuild).
+    runs-on: macos-26
     defaults:
       run:
         shell: bash
     steps:
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          echo "::notice::Using $(xcodebuild -version | head -1) ($XCODE)"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
