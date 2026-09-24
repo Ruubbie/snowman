@@ -5,7 +5,9 @@ import { OlafOverBudget } from './budget.js';
 
 const STABLE_INSTRUCTIONS =
   'You are Olaf, the AI character running on Snowman, talking directly with the person you help. ' +
-  'Use the available tools when they let you answer more accurately. Be concise and honest.';
+  'Use the available tools when they let you answer more accurately - for training questions, look at the ' +
+  'running plan and recent runs instead of guessing. Be concise and honest; this is a chat, so keep replies short ' +
+  'unless asked for detail.';
 
 /**
  * conversations / conversation_messages repo.
@@ -26,6 +28,14 @@ export function createConversationRepo(pool) {
       );
       return rows.map((r) => ({ role: r.role, content: JSON.parse(r.content) }));
     },
+    /** Just the readable turns: user text and Olaf's text replies (tool calls/results left out). */
+    async loadTranscript(id) {
+      const [rows] = await pool.query(
+        'SELECT role, content, created_at FROM conversation_messages WHERE conversation_id = ? ORDER BY id',
+        [id],
+      );
+      return transcriptOf(rows.map((r) => ({ role: r.role, content: JSON.parse(r.content), at: r.created_at })));
+    },
     async appendMessages(id, messages) {
       for (const m of messages) {
         await pool.query(
@@ -36,6 +46,24 @@ export function createConversationRepo(pool) {
       await pool.query('UPDATE conversations SET updated_at = UTC_TIMESTAMP(3) WHERE id = ?', [id]);
     },
   };
+}
+
+/**
+ * @param {{role: string, content: string|object[], at?: Date}[]} messages
+ * @returns {{role: 'user'|'olaf', text: string, at: Date|null}[]}
+ */
+export function transcriptOf(messages) {
+  const out = [];
+  for (const m of messages) {
+    const blocks = typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content || [];
+    const text = blocks
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n')
+      .trim();
+    if (text) out.push({ role: m.role === 'user' ? 'user' : 'olaf', text, at: m.at ?? null });
+  }
+  return out;
 }
 
 /**
@@ -66,7 +94,7 @@ function sendOlafError(reply, err) {
 }
 
 /**
- * Register core Olaf routes: POST /v1/olaf/chat, GET /v1/olaf/usage.
+ * Register core Olaf routes: POST /v1/olaf/chat, GET /v1/olaf/conversations/:id, GET /v1/olaf/usage.
  * @param {import('fastify').FastifyInstance} app
  * @param {{brain: object, budget: object, tools: object, events: object, persona: string, config: object, conversationRepo: ReturnType<typeof createConversationRepo>, clock?: () => Date}} ctx
  */
@@ -107,7 +135,8 @@ export function registerOlafRoutes(app, ctx) {
 
       try {
         const result = await runAgent(
-          { brain, toolRegistry: tools, budget, events, purpose: 'olaf.chat' },
+          // toolCtx is filled in by modules (e.g. ctx.toolCtx.running) so their tools work in chat.
+          { brain, toolRegistry: tools, budget, events, purpose: 'olaf.chat', toolCtx: ctx.toolCtx || {} },
           { model: config.olafModelSmart, systemBlocks, messages, maxTokens: 4000 },
         );
         await conversationRepo.appendMessages(conversationId, result.messages.slice(startLen));
@@ -119,6 +148,12 @@ export function registerOlafRoutes(app, ctx) {
       }
     },
   );
+
+  app.get('/v1/olaf/conversations/:id', async (request, reply) => {
+    const messages = await conversationRepo.loadTranscript(request.params.id);
+    if (!messages.length) return reply.code(404).send({ error: 'not_found' });
+    return { conversationId: request.params.id, messages };
+  });
 
   app.get('/v1/olaf/usage', async () => {
     const monthUsd = await budget.monthTotalUsd();

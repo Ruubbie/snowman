@@ -260,6 +260,15 @@ export function createVoiceEngine(settings, deps = {}) {
       return prepare(text).id;
     },
 
+    /** True when the clip for this text is already on disk (nothing to wait for). */
+    has(text) {
+      try {
+        return !!cache.stat(prepare(text).id);
+      } catch {
+        return false;
+      }
+    },
+
     /**
      * Synthesise (or reuse) and wait for the result.
      * @param {string} text

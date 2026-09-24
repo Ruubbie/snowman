@@ -136,6 +136,8 @@ export function buildApp(opts) {
     sendOlafError,
     // voice.enqueue(text) -> {id,url}|null, never blocks (see src/voice/engine.js).
     voice,
+    // Per-module context handed to Olaf's tools in chat; modules add their own key (running: {...}).
+    toolCtx: {},
   };
 
   registerOlafRoutes(app, ctx);

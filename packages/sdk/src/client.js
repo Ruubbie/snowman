@@ -59,6 +59,8 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
   const running = {
     today: () => request('/v1/running/today'),
     plan: ({ from, to }) => request('/v1/running/plan', { query: { from, to } }),
+    /** Next `days` days as planned now, each with its stored brief, audio urls and voice {ready, total}. */
+    upcoming: ({ days } = {}) => request('/v1/running/upcoming', { query: { days } }),
     runs: ({ limit } = {}) => request('/v1/running/runs', { query: { limit } }),
     run: (id) => request(`/v1/running/runs/${encodeURIComponent(id)}`),
     analysis: (id) => request(`/v1/running/runs/${encodeURIComponent(id)}/analysis`),
@@ -122,10 +124,19 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
     },
   };
 
+  // Talking with Olaf. A conversation continues when its id is passed back.
+  const olaf = {
+    /** -> {conversationId, reply} */
+    chat: ({ message, conversationId }) => request('/v1/olaf/chat', { method: 'POST', body: { message, conversationId: conversationId ?? null } }),
+    /** -> {conversationId, messages: [{role: 'user'|'olaf', text, at}]} */
+    conversation: (conversationId) => request(`/v1/olaf/conversations/${id(conversationId)}`),
+  };
+
   return {
     health: () => request('/v1/health', { auth: false }),
     pair: ({ code, deviceName }) => request('/v1/pair', { method: 'POST', body: { code, deviceName }, auth: false }),
     running,
+    olaf,
     admin,
     voice,
   };

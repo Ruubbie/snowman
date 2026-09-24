@@ -972,6 +972,56 @@ pre.json {
   background: var(--surface-card);
   box-shadow: var(--shadow-soft);
 }
+
+/* Olaf chat on Home */
+.chat-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+  max-height: calc(100vh - 260px);
+}
+.chat-card__head {
+  gap: 12px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-hair);
+}
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--surface-panel);
+}
+.chat .bubble--user {
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+}
+.chat__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.bubble--thinking {
+  color: var(--text-muted);
+  animation: chat-pulse 1.4s var(--ease-out) infinite;
+}
+@keyframes chat-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble--thinking {
+    animation: none;
+  }
+}
+.chat-card__composer {
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-hair);
+}
 .split-pane {
   display: grid;
   grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);

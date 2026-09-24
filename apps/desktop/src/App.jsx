@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity as ActivityIcon, House, MessageSquare, MonitorSmartphone, Settings as SettingsIcon, Sparkles, Wallet } from 'lucide-react';
+import { Activity as ActivityIcon, House, LayoutDashboard, MessageSquare, MonitorSmartphone, Settings as SettingsIcon, Wallet } from 'lucide-react';
 import { bridge } from './lib/bridge.js';
 import { api } from './lib/api.js';
 import { AppContext } from './lib/app-context.js';
@@ -9,7 +9,7 @@ import { Badge, Empty, Icon, Page } from './components/ui.jsx';
 import { OverlayProvider } from './components/overlay.jsx';
 import { modules, findModule } from './modules/index.js';
 import { Home } from './screens/Home.jsx';
-import { Talk } from './screens/Talk.jsx';
+import { Overview } from './screens/Overview.jsx';
 import { Conversations } from './screens/Conversations.jsx';
 import { Activity } from './screens/Activity.jsx';
 import { Usage } from './screens/Usage.jsx';
@@ -18,8 +18,8 @@ import { Settings } from './screens/Settings.jsx';
 import { Pair } from './screens/Pair.jsx';
 
 const CORE_NAV = [
-  { path: '/', label: 'Home', icon: House },
-  { path: '/talk', label: 'Talk to Olaf', icon: Sparkles, badge: 'Soon' },
+  { path: '/', label: 'Olaf', icon: House },
+  { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/conversations', label: 'Conversations', icon: MessageSquare },
   { path: '/activity', label: 'Activity', icon: ActivityIcon },
   { path: '/usage', label: 'Olaf usage', icon: Wallet },
@@ -88,8 +88,10 @@ function Screen({ parts }) {
   switch (head) {
     case undefined:
       return <Home />;
-    case 'talk':
-      return <Talk />;
+    case 'talk': // old link: talking to Olaf lives on Home now
+      return <Home />;
+    case 'overview':
+      return <Overview />;
     case 'conversations':
       return <Conversations id={a} />;
     case 'activity':

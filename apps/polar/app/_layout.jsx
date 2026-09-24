@@ -62,6 +62,7 @@ export default function RootLayout() {
         <Stack.Screen name="pair" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="olaf" />
         <Stack.Screen name="session/[id]" />
         <Stack.Screen name="run/index" options={{ gestureEnabled: false }} />
         <Stack.Screen name="run/summary" options={{ gestureEnabled: false }} />

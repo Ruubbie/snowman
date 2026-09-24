@@ -10,13 +10,28 @@ final class VoiceCoach: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
   private lazy var preferredVoice: AVSpeechSynthesisVoice? = Self.bestEnglishVoice()
   private var clips: [String: URL] = [:] // spoken text -> downloaded clip
   private var pending: Set<String> = []
-  /// (ready, total) whenever a clip download starts or lands.
+  /// Lines of the latest prefetch (the run about to start); progress counts only these.
+  private var focus: Set<String> = []
+  /// (ready, total) for the latest prefetch whenever a clip download starts or lands.
   var onClips: ((Int, Int) -> Void)?
   private var player: AVAudioPlayer?
+
+  /// Clips live in Caches, named by their content id, so a line recorded days
+  /// ago (or for a workout that was skipped) is still there next time.
+  private static let clipDir: URL = {
+    let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("olaf-voice", isDirectory: true)
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir
+  }()
 
   override init() {
     super.init()
     synth.delegate = self
+  }
+
+  private func reportProgress() {
+    onClips?(focus.filter { clips[$0] != nil }.count, focus.count)
   }
 
   /// Download server clips (text -> "/v1/voice/audio/<id>.wav"). The server
@@ -24,26 +39,31 @@ final class VoiceCoach: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
   /// spoken before its clip arrives just uses on-device speech.
   func prefetch(_ lines: [String: String], baseUrl: String?, token: String?) {
     guard let baseUrl, let token else { return }
+    focus = Set(lines.keys)
     for (text, path) in lines where clips[text] == nil && !pending.contains(text) {
       guard let url = URL(string: baseUrl + path) else { continue }
+      let dest = Self.clipDir.appendingPathComponent(url.lastPathComponent)
+      if FileManager.default.fileExists(atPath: dest.path) {
+        clips[text] = dest
+        continue
+      }
       pending.insert(text)
-      onClips?(clips.count, clips.count + pending.count)
       var request = URLRequest(url: url, timeoutInterval: 600)
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       URLSession.shared.downloadTask(with: request) { [weak self] tmp, response, _ in
         var file: URL?
         if let tmp, (response as? HTTPURLResponse)?.statusCode == 200 {
-          let dest = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
           try? FileManager.default.removeItem(at: dest)
           if (try? FileManager.default.moveItem(at: tmp, to: dest)) != nil { file = dest }
         }
         DispatchQueue.main.async {
           self?.pending.remove(text)
           if let file { self?.clips[text] = file }
-          if let self { self.onClips?(self.clips.count, self.clips.count + self.pending.count) }
+          self?.reportProgress()
         }
       }.resume()
     }
+    reportProgress()
   }
 
   func say(_ text: String) {

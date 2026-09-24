@@ -194,15 +194,128 @@ const CUE_TRIGGERS = [
   'gps_lost',
 ];
 
+/** How far ahead Olaf writes briefs and records their lines. */
+const PREPARE_DAYS = 3;
+/** Opening the app re-checks the next days at most this often. */
+const PREPARE_MIN_INTERVAL_MS = 5 * 60 * 1000;
+
+function preparable(session) {
+  return (session.kind === 'run' || session.kind === 'walk') && session.status === 'planned';
+}
+
 /**
- * @param {import('fastify').FastifyInstance} app
- * @param {object} ctx backbone ctx: {db, runningRepo?, config, events, jobs, tools, brain, budget, persona, brainAgent, sendOlafError, clock?}
+ * What a brief's lines depend on: the workout itself, not the latest runs.
+ * So a brief is written once per workout, and a skipped workout's lines (and
+ * their recorded voice) are reused the next time the same workout comes up.
  */
-export function registerRoutes(app, ctx) {
+function briefInputHash(ctx, session) {
+  const workout = { kind: session.kind, title: session.title, summary: session.summary, segments: session.segments };
+  return createHash('sha256')
+    .update([ctx.config.olafModelSmart, ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, JSON.stringify(workout)].join('\n'))
+    .digest('hex');
+}
+
+/**
+ * Briefs and their pre-recorded voice, shared by the routes and the jobs.
+ * @param {object} ctx backbone ctx
+ * @param {{warn: Function}} [log]
+ */
+export function createRunningShared(ctx, log = console) {
   const repo = ctx.runningRepo || createRunningRepo(ctx.db);
   const clock = ctx.clock || (() => new Date());
   const tzName = ctx.config?.tzName || 'UTC';
-  const runningDeps = { repo, events: ctx.events, clock, tzName };
+  const deps = { repo, events: ctx.events, clock, tzName };
+
+  /**
+   * The session's brief: stored, copied from the same workout, or written now
+   * (one AI call). null when Olaf is offline and there is nothing stored.
+   * Throws Olaf errors (budget, refusal...) from the AI call.
+   * @returns {Promise<{brief: object, cached: boolean, stale?: boolean}|null>}
+   */
+  async function ensureBrief(session, { force = false } = {}) {
+    const inputHash = briefInputHash(ctx, session);
+    const stored = await repo.getBrief(session.id);
+    if (!force) {
+      if (stored && stored.inputHash === inputHash) return { brief: stored.brief, cached: true };
+      const same = await repo.getBriefByInputHash?.(inputHash);
+      if (same) {
+        await repo.insertBrief(session.id, same.brief, same.model, inputHash);
+        return { brief: same.brief, cached: true };
+      }
+    }
+    // Olaf offline: an older brief is better than none.
+    if (!ctx.brain.available) return stored ? { brief: stored.brief, cached: true, stale: true } : null;
+
+    const [settings, recentRuns, recentDecisions] = await Promise.all([
+      repo.getSettings(),
+      repo.getRecentRuns(10),
+      repo.getRecentPlanDecisions(10),
+    ]);
+    const prompt = buildBriefPrompt(session, settings, recentRuns, recentDecisions);
+    const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
+    const { data } = await ctx.brainAgent.structured(
+      { brain: ctx.brain, budget: ctx.budget, purpose: 'running.brief' },
+      { model: ctx.config.olafModelSmart, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 2000 },
+      BRIEF_SCHEMA,
+    );
+    await repo.insertBrief(session.id, data, ctx.config.olafModelSmart, inputHash);
+    return { brief: data, cached: false };
+  }
+
+  let preparing = null;
+  let lastPrepareAt = 0;
+
+  /**
+   * Write briefs for the next few days' planned sessions and queue Olaf's
+   * voice for their lines (low priority), long before the runner heads out.
+   * One pass at a time; `minIntervalMs` skips a pass that ran recently.
+   */
+  function prepareUpcoming({ minIntervalMs = 0 } = {}) {
+    if (preparing) return preparing;
+    if (Date.now() - lastPrepareAt < minIntervalMs) return Promise.resolve();
+    lastPrepareAt = Date.now();
+    preparing = (async () => {
+      const today = localDateString(clock(), tzName);
+      const sessions = await repo.getSessionsBetween(today, addDays(today, PREPARE_DAYS - 1));
+      for (const session of sessions.filter(preparable)) {
+        try {
+          const res = await ensureBrief(session);
+          if (res) briefAudio(ctx.voice, res.brief);
+        } catch (err) {
+          log.warn({ err, sessionId: session.id }, 'preparing a brief failed');
+        }
+      }
+    })().finally(() => {
+      preparing = null;
+    });
+    return preparing;
+  }
+
+  /** Fire-and-forget prepare when an app shows up (throttled). */
+  function nudgePrepare() {
+    if (!repo.getSessionsBetween) return;
+    prepareUpcoming({ minIntervalMs: PREPARE_MIN_INTERVAL_MS }).catch((err) => log.warn({ err }, 'prepare failed'));
+  }
+
+  return { repo, deps, clock, tzName, ensureBrief, prepareUpcoming, nudgePrepare };
+}
+
+/** How many of a brief's lines are already recorded in Olaf's voice: {ready, total}. */
+function voiceProgress(voice, brief) {
+  if (!voice?.enabled || !brief || typeof voice.has !== 'function') return null;
+  const lines = [brief.opening_line, ...Object.values(brief.fallback_lines || {})].filter((t) => typeof t === 'string' && t);
+  return { ready: lines.filter((t) => voice.has(t)).length, total: lines.length };
+}
+
+/**
+ * @param {import('fastify').FastifyInstance} app
+ * @param {object} ctx backbone ctx: {db, runningRepo?, config, events, jobs, tools, brain, budget, persona, brainAgent, sendOlafError, clock?, toolCtx?}
+ * @param {ReturnType<typeof createRunningShared>} [shared]
+ */
+export function registerRoutes(app, ctx, shared = createRunningShared(ctx, app.log)) {
+  const { repo, clock, tzName, deps: runningDeps } = shared;
+  // Olaf's running tools (move/skip a session...) also work when chatting with him.
+  if (ctx.toolCtx) ctx.toolCtx.running = runningDeps;
 
   app.get('/v1/running/today', async () => {
     const date = localDateString(clock(), tzName);
@@ -211,8 +324,31 @@ export function registerRoutes(app, ctx) {
       const created = await materialize(runningDeps, { fromDate: date, days: 1 });
       session = created[0] || null;
     }
+    shared.nudgePrepare();
     return { date, session, cards: buildTodayCards(session) };
   });
+
+  // The next few days as planned right now (it can still change), each with
+  // its brief and how much of Olaf's voice for it is recorded. No AI calls.
+  app.get(
+    '/v1/running/upcoming',
+    { schema: { querystring: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 14 } } } } },
+    async (request) => {
+      const today = localDateString(clock(), tzName);
+      const days = request.query?.days ?? 5;
+      const sessions = await repo.getSessionsBetween(today, addDays(today, days - 1));
+      shared.nudgePrepare();
+      return {
+        today,
+        sessions: await Promise.all(
+          sessions.map(async (session) => {
+            const brief = preparable(session) ? ((await repo.getBrief(session.id))?.brief ?? null) : null;
+            return { ...session, brief, audio: briefAudio(ctx.voice, brief), voice: voiceProgress(ctx.voice, brief) };
+          }),
+        ),
+      };
+    },
+  );
 
   app.get(
     '/v1/running/plan',
@@ -246,6 +382,7 @@ export function registerRoutes(app, ctx) {
 
       await ctx.events.publish(EVENTS.RUNNING_RUN_COMPLETED, { runId, clientId: run.clientId });
       if (ctx.jobs) await ctx.jobs.enqueue('running.debrief', { runId });
+      shared.nudgePrepare(); // the plan may shift after a run
 
       return reply.code(201).send({ id: runId, clientId: run.clientId });
     },
@@ -340,38 +477,16 @@ export function registerRoutes(app, ctx) {
     async (request, reply) => {
       const session = await repo.getSessionById(request.body.sessionId);
       if (!session) return reply.code(404).send({ error: 'not_found' });
-
-      const [settings, recentRuns, recentDecisions, stored] = await Promise.all([
-        repo.getSettings(),
-        repo.getRecentRuns(10),
-        repo.getRecentPlanDecisions(10),
-        repo.getBrief(session.id),
-      ]);
-      const prompt = buildBriefPrompt(session, settings, recentRuns, recentDecisions);
-      // Same inputs (session, settings, runs, decisions, persona, model) -> reuse the stored brief, no AI call.
-      const inputHash = createHash('sha256')
-        .update([ctx.config.olafModelSmart, ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, prompt].join('\n'))
-        .digest('hex');
-      if (stored && stored.inputHash === inputHash && !request.body.force) {
-        return { sessionId: session.id, brief: stored.brief, cached: true, audio: briefAudio(ctx.voice, stored.brief) };
-      }
-      if (!ctx.brain.available) {
-        // Olaf offline: an older brief is better than none.
-        if (stored) {
-          return { sessionId: session.id, brief: stored.brief, cached: true, stale: true, audio: briefAudio(ctx.voice, stored.brief) };
-        }
-        return reply.code(503).send({ error: 'olaf_unavailable' });
-      }
-      const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
-
       try {
-        const { data } = await ctx.brainAgent.structured(
-          { brain: ctx.brain, budget: ctx.budget, purpose: 'running.brief' },
-          { model: ctx.config.olafModelSmart, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 2000 },
-          BRIEF_SCHEMA,
-        );
-        await repo.insertBrief(session.id, data, ctx.config.olafModelSmart, inputHash);
-        return { sessionId: session.id, brief: data, audio: briefAudio(ctx.voice, data) };
+        const res = await shared.ensureBrief(session, { force: request.body.force });
+        if (!res) return reply.code(503).send({ error: 'olaf_unavailable' });
+        return {
+          sessionId: session.id,
+          brief: res.brief,
+          ...(res.cached ? { cached: true } : {}),
+          ...(res.stale ? { stale: true } : {}),
+          audio: briefAudio(ctx.voice, res.brief),
+        };
       } catch (err) {
         if (ctx.sendOlafError(reply, err)) return reply;
         request.log.error({ err }, 'running brief failed');
@@ -466,18 +581,20 @@ export function registerRoutes(app, ctx) {
 }
 
 /**
- * Register the running.materialize / running.reminders / running.debrief job
- * handlers and recurring schedules against the live ctx.
+ * Register the running.materialize / running.prepare / running.reminders /
+ * running.debrief job handlers and recurring schedules against the live ctx.
  * @param {object} ctx
+ * @param {ReturnType<typeof createRunningShared>} [shared]
  */
-export function registerJobs(ctx) {
-  const repo = ctx.runningRepo || createRunningRepo(ctx.db);
-  const clock = ctx.clock || (() => new Date());
-  const tzName = ctx.config?.tzName || 'UTC';
-  const runningDeps = { repo, events: ctx.events, clock, tzName };
+export function registerJobs(ctx, shared = createRunningShared(ctx)) {
+  const { repo, clock, tzName, deps: runningDeps } = shared;
 
   ctx.jobs.registerHandler('running.materialize', async () => {
     await materialize(runningDeps, { days: 14 });
+  });
+
+  ctx.jobs.registerHandler('running.prepare', async () => {
+    await shared.prepareUpcoming();
   });
 
   ctx.jobs.registerHandler('running.reminders', async () => {
@@ -540,5 +657,6 @@ export function registerJobs(ctx) {
   });
 
   ctx.jobs.registerRecurring({ type: 'running.materialize', everyDayAt: '03:00' });
+  ctx.jobs.registerRecurring({ type: 'running.prepare', everyDayAt: '03:15' });
   ctx.jobs.registerRecurring({ type: 'running.reminders', everyDayAt: '03:30' });
 }

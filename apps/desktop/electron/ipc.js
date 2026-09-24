@@ -5,6 +5,8 @@ const { ipcMain } = require('electron');
 
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 const TIMEOUT_MS = 20000;
+/** Olaf thinking (and using his tools) takes longer than a data request. */
+const CHAT_TIMEOUT_MS = 120000;
 
 /** http(s) origin + optional path prefix, no trailing slash. Throws on anything else. */
 function normalizeServerUrl(input) {
@@ -17,7 +19,7 @@ function normalizeServerUrl(input) {
 
 async function timedFetch(url, init) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), url.includes('/v1/olaf/chat') ? CHAT_TIMEOUT_MS : TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {

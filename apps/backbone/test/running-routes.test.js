@@ -57,6 +57,12 @@ function fakeRunningRepo() {
     async insertBrief(sessionId, brief, model, inputHash = null) {
       briefs.set(sessionId, { brief, model, inputHash });
     },
+    async getBriefByInputHash(inputHash) {
+      return [...briefs.values()].find((b) => b.inputHash === inputHash) || null;
+    },
+    async getSessionsBetween(from, to) {
+      return [...sessions.values()].filter((x) => x.date >= from && x.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+    },
     async insertCue(cue) {
       cues.push(cue);
     },
@@ -237,4 +243,59 @@ test('running routes require a Bearer token', async () => {
   const app = buildTestApp({ brain: fakeBrainWith({}), runningRepo: fakeRunningRepo() });
   const response = await app.inject({ method: 'POST', url: '/v1/running/cue', payload: {} });
   assert.equal(response.statusCode, 401);
+});
+
+const BRIEF = {
+  focus: ['easy'],
+  opening_line: 'Off we go.',
+  targets: [],
+  fallback_lines: {
+    too_fast: 'a', too_slow: 'b', to_run: 'c', to_walk: 'd', km_split: 'e', halfway: 'f', finish: 'g', encourage: 'h',
+  },
+};
+
+function session(id, date, extra = {}) {
+  return {
+    id, date, kind: 'walk', title: 'Recovery walk', summary: '25 min walk', segments: [{ kind: 'walk', seconds: 1500 }],
+    status: 'planned', source: 'program', programWeek: 1, ...extra,
+  };
+}
+
+test('a brief is written once per workout: the same workout on another day reuses it without an AI call', async () => {
+  const runningRepo = fakeRunningRepo();
+  runningRepo.sessions.set('a', session('a', '2026-02-02'));
+  runningRepo.sessions.set('b', session('b', '2026-02-05'));
+  runningRepo.sessions.set('c', session('c', '2026-02-06', { segments: [{ kind: 'walk', seconds: 1800 }] }));
+  const brain = fakeBrainWith({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(BRIEF) }], usage: {} });
+  const app = buildTestApp({ brain, runningRepo });
+  const post = (sessionId) =>
+    app.inject({ method: 'POST', url: '/v1/running/brief', headers: { authorization: `Bearer ${TEST_TOKEN}` }, payload: { sessionId } });
+
+  assert.equal((await post('a')).statusCode, 200);
+  const b = await post('b');
+  assert.equal(b.json().cached, true);
+  assert.deepEqual(b.json().brief, BRIEF);
+  assert.equal(brain.calls.length, 1);
+  await post('c'); // different segments: a new brief
+  assert.equal(brain.calls.length, 2);
+});
+
+test('GET /v1/running/upcoming lists the next days with any stored brief', async () => {
+  const runningRepo = fakeRunningRepo();
+  runningRepo.sessions.set('a', session('a', '2026-02-02'));
+  runningRepo.sessions.set('r', session('r', '2026-02-03', { kind: 'rest', title: 'Rest', segments: [] }));
+  runningRepo.sessions.set('z', session('z', '2026-03-01'));
+  runningRepo.briefs.set('a', { brief: BRIEF, model: 'm', inputHash: 'x' });
+  const brain = { available: false, async createMessage() { throw new Error('no AI calls here'); } };
+  const app = buildApp({
+    config: BASE_CONFIG, db: null, brain, budget: fakeBudget(), deviceRepo: fakeDeviceRepo(), runningRepo,
+    events: { async publish() {} }, clock: () => new Date('2026-02-02T08:00:00Z'),
+  });
+  const res = await app.inject({ method: 'GET', url: '/v1/running/upcoming?days=4', headers: { authorization: `Bearer ${TEST_TOKEN}` } });
+  assert.equal(res.statusCode, 200);
+  const body = res.json();
+  assert.equal(body.today, '2026-02-02');
+  assert.deepEqual(body.sessions.map((x) => x.id), ['a', 'r']);
+  assert.deepEqual(body.sessions[0].brief, BRIEF);
+  assert.equal(body.sessions[1].brief, null);
 });

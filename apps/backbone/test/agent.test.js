@@ -155,3 +155,14 @@ test('claude-haiku-4-5 gets no thinking parameter at all', async () => {
   assert.equal('temperature' in brain.calls[0], false);
   assert.equal('top_p' in brain.calls[0], false);
 });
+
+test('transcriptOf keeps the readable turns and drops tool plumbing', async () => {
+  const { transcriptOf } = await import('../src/brain/routes.js');
+  const out = transcriptOf([
+    { role: 'user', content: 'How does my week look?' },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'running_get_plan', input: {} }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: '[]' }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Two walks and a run.' }] },
+  ]);
+  assert.deepEqual(out.map((m) => [m.role, m.text]), [['user', 'How does my week look?'], ['olaf', 'Two walks and a run.']]);
+});

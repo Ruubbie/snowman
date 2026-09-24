@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, router } from 'expo-router';
-import { View } from 'react-native';
-import { Screen, SplitFrame, GhostWord, Text, Card, Button, Badge, Metric, IconButton, EmptyState, useTheme } from '@snowman/ui';
+import { Pressable, View } from 'react-native';
+import { Screen, SplitFrame, GhostWord, Text, Card, Button, Badge, Metric, IconButton, EmptyState, Icon, useTheme } from '@snowman/ui';
 import { getClient } from '../../src/lib/client.js';
 import { inferRunKind } from '../../src/lib/runKind.js';
+import { prefetchOlafLines } from '../../src/lib/olafVoice.js';
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -55,12 +56,38 @@ function headlineLines(session) {
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+function dayLabel(date, today) {
+  const days = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+  if (days === 1) return 'Tomorrow';
+  return WEEKDAY_NAMES[new Date(`${date}T12:00:00Z`).getUTCDay()];
+}
+
+/** "3 × 5 min run · 31 min" / "25 min walk" */
+function workoutLine(segments = []) {
+  if (!segments.length) return '';
+  const min = (s) => `${Math.round(s / 60)} min`;
+  const total = segments.reduce((t, s) => t + (s.seconds || 0), 0);
+  const runs = segments.filter((s) => s.kind === 'run');
+  if (!runs.length) return `${min(total)} walk`;
+  if (runs.length === 1 && segments.length === 1) return `${min(runs[0].seconds)} run`;
+  return `${runs.length} × ${min(runs[0].seconds)} run · ${min(total)}`;
+}
+
+function voiceLine(s) {
+  if (s.kind === 'rest' || s.status !== 'planned') return null;
+  if (!s.brief) return 'Olaf writes his lines for this soon';
+  if (!s.voice) return null;
+  if (s.voice.ready >= s.voice.total) return "Olaf's lines are recorded";
+  return `Olaf is recording his lines · ${s.voice.ready} of ${s.voice.total}`;
+}
+
 export default function Today() {
   const theme = useTheme();
   const c = theme.colors;
   const [data, setData] = useState(null);
   const [brief, setBrief] = useState(null);
   const [lastRun, setLastRun] = useState(null);
+  const [upcoming, setUpcoming] = useState(null);
   const [week, setWeek] = useState({ perDay: Array(7).fill(0), thisWeekKm: 0, lastWeekKm: 0 });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,13 +100,22 @@ export default function Today() {
       const res = await client.running.today();
       setData(res);
 
+      const upcomingP = client.running.upcoming({ days: 5 }).catch(() => null);
+      const laterOf = (up) => (up?.sessions || []).filter((s) => s.date !== up.today);
       const session = res.session;
       if (session?.id && (session.kind === 'run' || session.kind === 'walk')) {
         client.running
           .brief(session.id)
-          .then((b) => setBrief(b.brief && { ...b.brief, audio: b.audio }))
+          .then(async (b) => {
+            setBrief(b.brief && { ...b.brief, audio: b.audio });
+            // Olaf's lines onto the phone now, not when you're at the door.
+            prefetchOlafLines(b, laterOf(await upcomingP)).catch(() => {});
+          })
           .catch(() => {});
+      } else {
+        upcomingP.then((up) => prefetchOlafLines(null, laterOf(up))).catch(() => {});
       }
+      upcomingP.then((up) => up && setUpcoming({ today: up.today, sessions: laterOf(up) }));
 
       const runsRes = await client.running.runs({ limit: 30 });
       setLastRun(runsRes.runs?.[0] || null);
@@ -177,10 +213,42 @@ export default function Today() {
                 </View>
               </View>
 
-              <Card tone="tint" padding={20} style={{ marginTop: 26, flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
-                <Text style={{ fontFamily: theme.typography.display.fontFamily, fontWeight: '800', fontSize: 12, lineHeight: 17 }}>olaf</Text>
-                <Text variant="small" style={{ flex: 1 }}>{olafNote}</Text>
-              </Card>
+              <Pressable accessibilityRole="button" accessibilityLabel="Talk to Olaf" onPress={() => router.push('/olaf')}>
+                <Card tone="tint" padding={20} style={{ marginTop: 26, gap: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
+                    <Text style={{ fontFamily: theme.typography.display.fontFamily, fontWeight: '800', fontSize: 12, lineHeight: 17 }}>olaf</Text>
+                    <Text variant="small" style={{ flex: 1 }}>{olafNote}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end' }}>
+                    <Text variant="label" color={c.accent}>Talk to Olaf</Text>
+                    <Icon name="arrow-right" size={14} color={c.accent} />
+                  </View>
+                </Card>
+              </Pressable>
+
+              {upcoming?.sessions.length > 0 && (
+                <View style={{ marginTop: 26 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <Text variant="h3">Coming up</Text>
+                    <Text variant="caption" muted>can still change</Text>
+                  </View>
+                  {upcoming.sessions.map((s) => {
+                    const voice = voiceLine(s);
+                    return (
+                      <View key={s.id} style={{ flexDirection: 'row', gap: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.borderHair }}>
+                        <Text variant="eyebrow" muted numberOfLines={1} style={{ width: 104, marginTop: 5 }}>
+                          {dayLabel(s.date, upcoming.today)}
+                        </Text>
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Text variant="h4">{s.kind === 'rest' ? 'Rest day' : s.title}</Text>
+                          {s.kind !== 'rest' && <Text variant="small" muted>{workoutLine(s.segments) || s.summary}</Text>}
+                          {voice && <Text variant="caption" color={s.voice && s.voice.ready >= s.voice.total ? c.success : c.textFaint}>{voice}</Text>}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
               {lastRun ? (
                 <>

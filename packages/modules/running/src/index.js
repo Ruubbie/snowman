@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { registerRoutes, registerJobs } from './routes.js';
+import { registerRoutes, registerJobs, createRunningShared } from './routes.js';
 import { runningTools } from './tools.js';
 import { registerAdminRoutes } from './adminRoutes.js';
 
@@ -12,9 +12,11 @@ const runningModule = {
   migrationsDir: MIGRATIONS_DIR,
   tools: runningTools,
   register(app, ctx) {
-    registerRoutes(app, ctx);
+    // One brief/voice service for routes and jobs, so a prepare pass never runs twice at once.
+    const shared = createRunningShared(ctx, app.log);
+    registerRoutes(app, ctx, shared);
     registerAdminRoutes(app, ctx);
-    registerJobs(ctx);
+    registerJobs(ctx, shared);
   },
 };
 

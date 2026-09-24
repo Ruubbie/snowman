@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 const KEY = 'polar.token';
 const SERVER_KEY = 'polar.serverUrl';
+const CONVERSATION_KEY = 'polar.olafConversation';
 
 function web() {
   return {
@@ -37,6 +38,21 @@ function web() {
         // ignore
       }
     },
+    async getConversationId() {
+      try {
+        return globalThis.localStorage?.getItem(CONVERSATION_KEY) || null;
+      } catch {
+        return null;
+      }
+    },
+    async setConversationId(id) {
+      try {
+        if (id) globalThis.localStorage?.setItem(CONVERSATION_KEY, id);
+        else globalThis.localStorage?.removeItem(CONVERSATION_KEY);
+      } catch {
+        // ignore
+      }
+    },
   };
 }
 
@@ -56,6 +72,14 @@ function native() {
     async setServerUrl(url) {
       if (url) await SecureStore.setItemAsync(SERVER_KEY, url);
       else await SecureStore.deleteItemAsync(SERVER_KEY);
+    },
+    /** The chat with Olaf to pick up again next time. */
+    async getConversationId() {
+      return SecureStore.getItemAsync(CONVERSATION_KEY);
+    },
+    async setConversationId(id) {
+      if (id) await SecureStore.setItemAsync(CONVERSATION_KEY, id);
+      else await SecureStore.deleteItemAsync(CONVERSATION_KEY);
     },
   };
 }

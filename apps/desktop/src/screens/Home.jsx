@@ -1,178 +1,289 @@
-import { HousePlug, Car, Calendar, ListTodo } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Mic, Plus, Send } from 'lucide-react';
 import { useApp } from '../lib/app-context.js';
-import { navigate, useLoad } from '../lib/hooks.js';
+import { useLoad } from '../lib/hooks.js';
 import { errorMessage } from '../lib/api.js';
-import { fmtAgo, fmtUsd, fmtTime, humanEventType, fmtShortDate } from '../lib/format.js';
-import { Bar, Button, Card, ErrorNote, Icon, Loading, Metric, Page, Ring, Section } from '../components/ui.jsx';
-import { modules } from '../modules/index.js';
+import { Badge, Button, Card, ErrorNote, IconButton, Loading, Page, Section, Tag } from '../components/ui.jsx';
 
-const FUTURE = [
-  { icon: HousePlug, name: 'Smart home' },
-  { icon: Car, name: 'Car' },
-  { icon: Calendar, name: 'Calendar' },
-  { icon: ListTodo, name: 'Lists' },
-];
+const CONVERSATION_KEY = 'olaf.desktop.conversationId';
+const SUGGESTIONS = ['How does my week look?', 'How did my last run go?', 'Can we move tomorrow to the day after?'];
 
 function greeting(d = new Date()) {
   const h = d.getHours();
-  if (h < 6) return 'Still up';
+  if (h < 6) return 'Still up?';
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 }
 
+function readConversationId() {
+  try {
+    return localStorage.getItem(CONVERSATION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeConversationId(id) {
+  try {
+    if (id) localStorage.setItem(CONVERSATION_KEY, id);
+    else localStorage.removeItem(CONVERSATION_KEY);
+  } catch {
+    // private window: this chat just won't survive a reload
+  }
+}
+
+function chatError(err) {
+  if (err?.body?.error === 'olaf_unavailable') return "I can't think right now: the server has no AI key set.";
+  if (err?.body?.error === 'olaf_over_budget') return "I've used this month's AI budget. Raise it in the server config to keep talking.";
+  if (err?.body?.error === 'olaf_refusal') return "I'd rather not answer that one.";
+  if (err?.networkError === 'timeout' || /timeout/i.test(err?.message || '')) return 'That took too long. Try again?';
+  return errorMessage(err);
+}
+
 export function Home() {
-  const { client } = useApp();
-  const { data, error, loading, reload } = useLoad(() => client.admin.overview(), [client]);
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-
-  if (loading && !data) {
-    return (
-      <Page eyebrow={today} title={greeting()} ghost="olaf">
-        <Loading rows={6} />
-      </Page>
-    );
-  }
-  if (!data) {
-    return (
-      <Page eyebrow={today} title={greeting()} ghost="olaf">
-        <ErrorNote error={errorMessage(error)} onRetry={reload} />
-      </Page>
-    );
-  }
-  const { counts, ai } = data;
-  const pct = ai.budgetUsd > 0 ? ai.monthUsd / ai.budgetUsd : 0;
-  const month = new Date(ai.monthStart).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
-
   return (
-    <Page
-      eyebrow={today}
-      title={greeting()}
-      ghost="olaf"
-      sub={`This month I made ${counts.monthAiCalls} AI calls and spent ${fmtUsd(ai.monthUsd)} of your ${fmtUsd(ai.budgetUsd)}. Here is everything I know and did.`}
-    >
-      <ErrorNote error={error && errorMessage(error)} onRetry={reload} />
-      <div className="metrics">
-        <Metric label="Conversations" count={counts.conversations} size={40} i={0} />
-        <Metric label="Messages" count={counts.messages} size={40} i={1} />
-        <Metric label="AI calls" count={counts.aiCalls} size={40} i={2} delta={`${counts.monthAiCalls} this month`} />
-        <Metric label="Events" count={counts.events} size={40} i={3} />
-        <Metric label="Devices" count={counts.devices} size={40} i={4} />
-      </div>
-
-      <div className="grid grid--main-side section">
-        <Card tone="white" i={1} interactive onClick={() => navigate('/usage')}>
-          <div className="row" style={{ alignItems: 'flex-start', gap: 28 }}>
-            <Ring size={96} weight={10} progress={pct} color={pct >= 0.8 ? 'var(--warning)' : 'var(--accent)'}>
-              <span className="mono strong">{Math.round(pct * 100)}%</span>
-            </Ring>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="ol-card__eyebrow">AI spend · {month}</div>
-              <Metric value={fmtUsd(ai.monthUsd)} unit={`of ${fmtUsd(ai.budgetUsd)}`} size={40} />
-              <div style={{ marginTop: 18 }} className="stack">
-                {ai.byPurpose.slice(0, 4).map((p, i) => (
-                  <div key={p.key} className="split-row" style={{ gridTemplateColumns: '130px 1fr 70px' }}>
-                    <span className="small muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.key}
-                    </span>
-                    <Bar value={p.costUsd} max={ai.byPurpose[0].costUsd || 1} i={i} />
-                    <span className="mono strong" style={{ textAlign: 'right' }}>
-                      {fmtUsd(p.costUsd)}
-                    </span>
-                  </div>
-                ))}
-                {!ai.byPurpose.length && <span className="small muted">No AI calls yet this month.</span>}
-              </div>
-            </div>
-          </div>
-        </Card>
-        <Card tone="tint" i={2}>
-          <div className="ol-card__eyebrow">Last seen</div>
-          <dl className="kv">
-            <dt>Message</dt>
-            <dd>{fmtAgo(data.lastActivity.message)}</dd>
-            <dt>AI call</dt>
-            <dd>{fmtAgo(data.lastActivity.aiCall)}</dd>
-            <dt>Event</dt>
-            <dd>{fmtAgo(data.lastActivity.event)}</dd>
-            {modules.map((m) => (
-              <FragmentRow key={m.id} label={`${m.name}`} value={fmtAgo(data.modules?.[m.id]?.lastActivity?.run)} />
-            ))}
-          </dl>
-        </Card>
-      </div>
-
-      <Section title="Modules" eyebrow="What I look after" i={3}>
-        <div className="grid grid--2">
-          {modules.map((m, i) => (
-            <m.OverviewCard key={m.id} data={data.modules?.[m.id]} i={i} />
-          ))}
-          <Card tone="outline" i={modules.length}>
-            <div className="ol-card__eyebrow">Coming later</div>
-            <p className="small muted" style={{ margin: '0 0 18px' }}>
-              More modules plug in here, each with its own screens and card.
-            </p>
-            <div className="row row--wrap" style={{ gap: 18 }}>
-              {FUTURE.map((f) => (
-                <span key={f.name} className="row small muted" style={{ gap: 8 }}>
-                  <Icon icon={f.icon} size={18} /> {f.name}
-                </span>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </Section>
-
-      <div className="grid grid--2">
-        <Section title="Recent AI calls" i={4} actions={<Button variant="ghost" size="sm" onClick={() => navigate('/usage')}>All usage</Button>}>
-          <div className="list">
-            {data.recentAi.map((r, i) => (
-              <div key={r.id} className="list-row rise" style={{ '--i': i, padding: '12px 2px' }}>
-                <div className="list-row__main">
-                  <div className="list-row__title" style={{ fontSize: 14 }}>
-                    {r.purpose}
-                  </div>
-                  <div className="list-row__meta">
-                    <span>{r.model}</span>
-                    <span>
-                      {fmtShortDate(r.at)} {fmtTime(r.at)}
-                    </span>
-                  </div>
-                </div>
-                <span className="mono strong">{fmtUsd(r.costUsd)}</span>
-              </div>
-            ))}
-            {!data.recentAi.length && <p className="small muted">No AI calls yet.</p>}
-          </div>
-        </Section>
-        <Section title="What happened" i={5} actions={<Button variant="ghost" size="sm" onClick={() => navigate('/activity')}>Activity</Button>}>
-          <div className="list">
-            {data.recentEvents.map((e, i) => (
-              <div key={e.id} className="list-row rise" style={{ '--i': i, padding: '12px 2px' }}>
-                <div className="list-row__main">
-                  <div className="list-row__title" style={{ fontSize: 14 }}>
-                    {humanEventType(e.type)}
-                  </div>
-                  <div className="list-row__meta">
-                    <span>{e.type}</span>
-                  </div>
-                </div>
-                <span className="mono muted">{fmtAgo(e.createdAt)}</span>
-              </div>
-            ))}
-            {!data.recentEvents.length && <p className="small muted">Nothing logged yet.</p>}
-          </div>
-        </Section>
+    <Page eyebrow={today} title={greeting()} ghost="olaf" sub="Talk to me about anything. Here's what I have planned for you in the next few days.">
+      <div className="grid grid--main-side">
+        <Chat />
+        <ComingUp />
       </div>
     </Page>
   );
 }
 
-function FragmentRow({ label, value }) {
+function Chat() {
+  const { client } = useApp();
+  const [conversationId, setConversationId] = useState(readConversationId);
+  const [messages, setMessages] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(Boolean(conversationId));
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
+  const scroller = useRef(null);
+  const input = useRef(null);
+
+  useEffect(() => {
+    if (!conversationId || messages.length) return;
+    let alive = true;
+    client.olaf
+      .conversation(conversationId)
+      .then((res) => alive && setMessages(res.messages))
+      .catch(() => {
+        // gone (deleted under Conversations): start fresh
+        if (!alive) return;
+        writeConversationId(null);
+        setConversationId(null);
+      })
+      .finally(() => alive && setLoadingHistory(false));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, sending]);
+
+  async function send(text = draft) {
+    const message = text.trim();
+    if (!message || sending) return;
+    setDraft('');
+    setError(null);
+    setSending(true);
+    setMessages((m) => [...m, { role: 'user', text: message }]);
+    try {
+      const res = await client.olaf.chat({ message, conversationId });
+      if (res.conversationId !== conversationId) {
+        setConversationId(res.conversationId);
+        writeConversationId(res.conversationId);
+      }
+      setMessages((m) => [...m, { role: 'olaf', text: res.reply || '…' }]);
+    } catch (err) {
+      setMessages((m) => m.slice(0, -1));
+      setDraft(message);
+      setError(chatError(err));
+    } finally {
+      setSending(false);
+      input.current?.focus();
+    }
+  }
+
+  function newChat() {
+    writeConversationId(null);
+    setConversationId(null);
+    setMessages([]);
+    setError(null);
+    input.current?.focus();
+  }
+
   return (
-    <>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </>
+    <Card tone="white" padding={0} i={1} className="chat-card">
+      <div className="row chat-card__head">
+        <span className="olaf-says__name">olaf</span>
+        <span className="small muted">{conversationId ? 'Picking up where we left off' : 'New conversation'}</span>
+        <span className="spacer" />
+        {messages.length > 0 && (
+          <Button variant="ghost" size="sm" iconLeft={Plus} iconRight={null} onClick={newChat} disabled={sending}>
+            New chat
+          </Button>
+        )}
+      </div>
+
+      <div className="chat" ref={scroller}>
+        {loadingHistory ? (
+          <Loading rows={3} />
+        ) : messages.length === 0 ? (
+          <div className="chat__empty">
+            <div className="bubble bubble--assistant">
+              Hi! Ask me how your week looks, move a session, or tell me how you're feeling. I can see your plan and your runs.
+            </div>
+            <div className="row row--wrap" style={{ gap: 8 }}>
+              {SUGGESTIONS.map((s) => (
+                <Tag key={s} onClick={() => send(s)}>
+                  {s}
+                </Tag>
+              ))}
+            </div>
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div key={i} className={`bubble ${m.role === 'user' ? 'bubble--user' : 'bubble--assistant'}`}>
+              {m.text}
+            </div>
+          ))
+        )}
+        {sending && <div className="bubble bubble--assistant bubble--thinking">Thinking…</div>}
+      </div>
+
+      {error && (
+        <div style={{ padding: '0 24px' }}>
+          <ErrorNote error={error} />
+        </div>
+      )}
+
+      <form
+        className="row chat-card__composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <div className="ol-inputwrap" style={{ flex: 1 }}>
+          <input
+            ref={input}
+            className="ol-input"
+            placeholder="Message Olaf"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            autoFocus
+            disabled={loadingHistory}
+          />
+        </div>
+        <IconButton icon={Mic} variant="outline" label="Voice (coming later)" disabled />
+        <IconButton icon={Send} variant="dark" label="Send" disabled={!draft.trim() || sending} onClick={() => send()} />
+      </form>
+    </Card>
+  );
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function dayLabel(date, today) {
+  const days = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  return WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+}
+
+function minutes(s) {
+  return `${Math.round(s / 60)} min`;
+}
+
+/** "3 × 5 min run, 2 min walks · 31 min" */
+export function workoutLine(segments = []) {
+  if (!segments.length) return '';
+  const total = segments.reduce((t, s) => t + (s.seconds || 0), 0);
+  const runs = segments.filter((s) => s.kind === 'run');
+  if (!runs.length) return `${minutes(total)} walk`;
+  if (runs.length === 1 && segments.length === 1) return `${minutes(runs[0].seconds)} run`;
+  // The walk after the first run is the recovery between runs (the first walk is the warm-up).
+  const gap = segments[segments.indexOf(runs[0]) + 1];
+  const between = runs.length > 1 && gap?.kind === 'walk' ? `, ${minutes(gap.seconds)} walks` : '';
+  return `${runs.length} × ${minutes(runs[0].seconds)} run${between} · ${minutes(total)}`;
+}
+
+function VoiceNote({ session }) {
+  if (session.kind === 'rest') return null;
+  if (session.status !== 'planned') return null;
+  if (!session.brief) return <span className="small faint">I'll write the lines for this soon</span>;
+  const v = session.voice;
+  if (!v) return <span className="small faint">Lines written</span>;
+  if (v.ready >= v.total) return <Badge tone="success" dot>My lines are recorded</Badge>;
+  return (
+    <Badge tone="warning" dot title="Recording takes about half a minute per line on the server">
+      Recording my lines · {v.ready} of {v.total}
+    </Badge>
+  );
+}
+
+const STATUS_TONE = { done: 'success', skipped: 'neutral', moved: 'info', replaced: 'info' };
+
+function ComingUp() {
+  const { client } = useApp();
+  const { data, error, loading, reload } = useLoad(() => client.running.upcoming({ days: 5 }), [client]);
+
+  // Recording runs in the background on the server: refresh while it's busy.
+  const recording = data?.sessions.some((s) => s.voice && s.voice.ready < s.voice.total);
+  useEffect(() => {
+    if (!recording) return undefined;
+    const t = setInterval(reload, 30000);
+    return () => clearInterval(t);
+  }, [recording, reload]);
+
+  return (
+    <Section title="Coming up" eyebrow="The plan for now · it can still change" i={2}>
+      <ErrorNote error={error && errorMessage(error)} onRetry={reload} />
+      {loading && !data && <Loading rows={4} />}
+      {data && !data.sessions.length && <p className="small muted">Nothing planned yet. Set a program start in Polar's settings.</p>}
+      <div className="list">
+        {data?.sessions.map((s, i) => (
+          <div key={s.id} className="list-row rise" style={{ '--i': i, alignItems: 'flex-start', padding: '14px 2px' }}>
+            <div style={{ width: 92, flex: 'none' }}>
+              <div className="strong small" style={s.date === data.today ? { color: 'var(--accent)' } : undefined}>
+                {dayLabel(s.date, data.today)}
+              </div>
+              <div className="mono faint" style={{ fontSize: 11, marginTop: 2 }}>
+                {s.date.slice(8)}/{s.date.slice(5, 7)}
+              </div>
+            </div>
+            <div className="list-row__main">
+              <div className="row" style={{ gap: 8 }}>
+                <span className="list-row__title" style={{ fontSize: 15 }}>
+                  {s.kind === 'rest' ? 'Rest day' : s.title}
+                </span>
+                {STATUS_TONE[s.status] && <Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge>}
+              </div>
+              {s.kind !== 'rest' && (
+                <div className="small muted" style={{ marginTop: 4 }}>
+                  {workoutLine(s.segments) || s.summary}
+                </div>
+              )}
+              {s.brief?.focus?.[0] && s.status === 'planned' && (
+                <div className="small" style={{ marginTop: 6 }}>
+                  “{s.brief.focus[0]}”
+                </div>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <VoiceNote session={s} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }

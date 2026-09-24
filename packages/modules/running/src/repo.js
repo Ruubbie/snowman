@@ -309,6 +309,15 @@ export function createRunningRepo(pool) {
       if (!rows.length) return null;
       return { brief: parseJsonColumn(rows[0].brief, {}), model: rows[0].model, inputHash: rows[0].input_hash, createdAt: rows[0].created_at };
     },
+    /** Newest brief written for the same workout (any session), for reuse. */
+    async getBriefByInputHash(inputHash) {
+      const [rows] = await pool.query(
+        'SELECT brief, model, input_hash, created_at FROM run_briefs WHERE input_hash = ? ORDER BY created_at DESC LIMIT 1',
+        [inputHash],
+      );
+      if (!rows.length) return null;
+      return { brief: parseJsonColumn(rows[0].brief, {}), model: rows[0].model, inputHash: rows[0].input_hash, createdAt: rows[0].created_at };
+    },
     async insertBrief(sessionId, brief, model, inputHash = null) {
       await pool.query(
         `INSERT INTO run_briefs (session_id, brief, model, input_hash, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))
