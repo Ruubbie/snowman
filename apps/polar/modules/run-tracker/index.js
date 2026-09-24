@@ -25,6 +25,11 @@ export function cancel() {
   return RunTrackerNative?.cancel?.();
 }
 
+/** Download the brief's server voice clips ahead of Start. */
+export function prefetch(brief) {
+  return RunTrackerNative?.prefetch?.(brief ?? {});
+}
+
 export function start(options) {
   return RunTrackerNative?.start(options);
 }
@@ -62,6 +67,7 @@ export default {
   configure,
   prepare,
   cancel,
+  prefetch,
   start,
   pause,
   resume,

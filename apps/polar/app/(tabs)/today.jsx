@@ -77,7 +77,7 @@ export default function Today() {
       if (session?.id && (session.kind === 'run' || session.kind === 'walk')) {
         client.running
           .brief(session.id)
-          .then((b) => setBrief(b.brief))
+          .then((b) => setBrief(b.brief && { ...b.brief, audio: b.audio }))
           .catch(() => {});
       }
 

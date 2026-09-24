@@ -55,6 +55,7 @@ export default function Run() {
         token,
         cueClient: { postCue: (body) => client.running.cue(body) },
       });
+      if (brief) tracker.prefetch(brief); // the effect below ran before the tracker knew the server
 
       tickSub = tracker.addListener('tick', setSnapshot);
       cueSub = tracker.addListener('cue', (cue) => {
@@ -73,7 +74,7 @@ export default function Run() {
         client.running
           .brief(sessionId)
           .then((res) => {
-            setBrief(res.brief);
+            setBrief(res.brief && { ...res.brief, audio: res.audio });
             if (res.brief?.focus?.[0]) {
               setLastCue({ text: res.brief.focus[0], trigger: 'brief', source: 'brief' });
               setToastVisible(true);
@@ -93,6 +94,10 @@ export default function Run() {
       if (!runStartedRef.current) tracker.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    if (brief) tracker.prefetch(brief);
+  }, [brief]);
 
   const runStartedRef = useRef(false);
   const startRun = useCallback(async () => {

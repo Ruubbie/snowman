@@ -20,6 +20,7 @@ const unavailable = {
   configure() {},
   prepare: async () => {},
   cancel() {},
+  prefetch() {},
   start: fail,
   pause() {},
   resume() {},
@@ -34,6 +35,7 @@ const impl = isSimulator ? simulator : isNative ? runTrackerNative : unavailable
 export const configure = impl.configure;
 export const prepare = impl.prepare;
 export const cancel = impl.cancel;
+export const prefetch = impl.prefetch;
 export const start = impl.start;
 export const pause = impl.pause;
 export const resume = impl.resume;
@@ -42,4 +44,4 @@ export const getUnfinishedRuns = impl.getUnfinishedRuns;
 export const addListener = impl.addListener;
 export const removeAllListeners = impl.removeAllListeners;
 
-export default { isNative, isSimulator, unavailableReason, configure, prepare, cancel, start, pause, resume, finish, getUnfinishedRuns, addListener, removeAllListeners };
+export default { isNative, isSimulator, unavailableReason, configure, prepare, cancel, prefetch, start, pause, resume, finish, getUnfinishedRuns, addListener, removeAllListeners };

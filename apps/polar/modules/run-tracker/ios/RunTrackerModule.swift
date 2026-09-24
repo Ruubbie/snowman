@@ -49,6 +49,12 @@ public class RunTrackerModule: Module {
       }
     }
 
+    Function("prefetch") { (brief: [String: Any]) in
+      DispatchQueue.main.async {
+        self.controller.prefetchClips(from: brief)
+      }
+    }
+
     Function("start") { (options: [String: Any]) in
       DispatchQueue.main.async {
         self.controller.start(options: options)

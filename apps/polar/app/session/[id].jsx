@@ -29,7 +29,7 @@ export default function SessionBrief() {
       try {
         const client = await getClient();
         const res = await client.running.brief(id);
-        if (!cancelled) setBrief(res.brief);
+        if (!cancelled) setBrief(res.brief && { ...res.brief, audio: res.audio });
       } catch (err) {
         if (!cancelled) setError(err.message || 'Brief unavailable');
       } finally {

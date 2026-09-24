@@ -51,6 +51,8 @@ export async function prepare() {
 
 export function cancel() {}
 
+export function prefetch() {}
+
 let runState = null;
 
 function fallbackLineFor(trigger, brief) {
@@ -337,6 +339,7 @@ export default {
   isAvailable,
   configure,
   prepare,
+  prefetch,
   start,
   pause,
   resume,

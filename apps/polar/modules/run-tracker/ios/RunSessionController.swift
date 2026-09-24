@@ -268,6 +268,25 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
       finish: fb?["finish"] as? String ?? "",
       encourage: fb?["encourage"] as? String ?? ""
     )
+    prefetchClips(from: brief)
+  }
+
+  /// Olaf's own voice for the brief's lines, when the server made clips.
+  /// Called as soon as the run screen has the brief, so clips are ready by Start.
+  func prefetchClips(from brief: [String: Any]?) {
+    let audio = brief?["audio"] as? [String: Any]
+    var clipPaths: [String: String] = [:]
+    if let text = brief?["opening_line"] as? String,
+      let path = (audio?["opening_line"] as? [String: Any])?["url"] as? String {
+      clipPaths[text] = path
+    }
+    let fbAudio = audio?["fallback_lines"] as? [String: Any]
+    for (key, value) in (brief?["fallback_lines"] as? [String: Any]) ?? [:] {
+      if let text = value as? String, let path = (fbAudio?[key] as? [String: Any])?["url"] as? String {
+        clipPaths[text] = path
+      }
+    }
+    voice.prefetch(clipPaths, baseUrl: baseUrl, token: token)
   }
 
   // MARK: - Clock & segments
