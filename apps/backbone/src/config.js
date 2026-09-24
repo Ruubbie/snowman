@@ -62,7 +62,8 @@ export function loadConfig(env = process.env) {
 const REPO_DATA_DIR = fileURLToPath(new URL('../../../data/', import.meta.url));
 
 /**
- * Olaf's server-side voice (Kokoro-82M). fp32 is the default dtype: on Arm
+ * Olaf's server-side voice: a Voicebox voice clone when VOICEBOX_URL and
+ * VOICEBOX_PROFILE are set, else Kokoro-82M. fp32 is the default dtype: on Arm
  * it measured ~1.4x faster than q8 with 2 threads (q8's dynamic-quant ops
  * are slow on ARM64) and it is the reference quality.
  * @param {NodeJS.ProcessEnv} env
@@ -92,5 +93,7 @@ export function loadVoiceConfig(env = process.env) {
     voiceCacheDir: env.VOICE_CACHE_DIR || path.join(REPO_DATA_DIR, 'voice-cache'),
     voiceCacheMaxMb: maxMb,
     hfCacheDir: env.HF_CACHE_DIR || path.join(REPO_DATA_DIR, 'hf-cache'),
+    voiceboxUrl: env.VOICEBOX_URL || '',
+    voiceboxProfile: env.VOICEBOX_PROFILE || '',
   };
 }

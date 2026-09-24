@@ -3,7 +3,7 @@ import { useApp } from '../lib/app-context.js';
 import { navigate, useLoad } from '../lib/hooks.js';
 import { errorMessage } from '../lib/api.js';
 import { fmtAgo, fmtUsd, fmtTime, humanEventType, fmtShortDate } from '../lib/format.js';
-import { Bar, Badge, Button, Card, ErrorNote, Icon, Loading, Metric, Page, Ring, Section } from '../components/ui.jsx';
+import { Bar, Button, Card, ErrorNote, Icon, Loading, Metric, Page, Ring, Section } from '../components/ui.jsx';
 import { modules } from '../modules/index.js';
 
 const FUTURE = [
@@ -50,11 +50,6 @@ export function Home() {
       title={greeting()}
       ghost="olaf"
       sub={`This month I made ${counts.monthAiCalls} AI calls and spent ${fmtUsd(ai.monthUsd)} of your ${fmtUsd(ai.budgetUsd)}. Here is everything I know and did.`}
-      actions={
-        <Badge tone={data.olaf.available ? 'success' : 'neutral'} dot>
-          {data.olaf.available ? 'Olaf online' : 'Olaf offline'}
-        </Badge>
-      }
     >
       <ErrorNote error={error && errorMessage(error)} onRetry={reload} />
       <div className="metrics">

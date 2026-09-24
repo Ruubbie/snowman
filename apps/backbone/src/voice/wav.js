@@ -59,3 +59,39 @@ export function encodeWav(chunks, { sampleRate = 24000, gapMs = 0 } = {}) {
 export function wavDurationMs(byteLength, sampleRate = 24000) {
   return Math.round(((Math.max(0, byteLength - WAV_HEADER_BYTES) / 2) / sampleRate) * 1000);
 }
+
+/**
+ * Decode a PCM WAV (16-bit int or 32-bit float, any channel count) to mono
+ * Float32 samples. Enough for what Voicebox returns; no ffmpeg needed.
+ * @param {Buffer} buf
+ * @returns {{samples: Float32Array, sampleRate: number}}
+ */
+export function decodeWav(buf) {
+  if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') throw new Error('not a WAV file');
+  let fmt = null;
+  for (let pos = 12; pos + 8 <= buf.length; ) {
+    const id = buf.toString('ascii', pos, pos + 4);
+    const size = buf.readUInt32LE(pos + 4);
+    const body = pos + 8;
+    if (id === 'fmt ') {
+      fmt = { format: buf.readUInt16LE(body), channels: buf.readUInt16LE(body + 2), sampleRate: buf.readUInt32LE(body + 4), bits: buf.readUInt16LE(body + 14) };
+    } else if (id === 'data' && fmt) {
+      const float = fmt.format === 3 || (fmt.format === 0xfffe && fmt.bits === 32);
+      if (!(float && fmt.bits === 32) && fmt.bits !== 16) throw new Error(`unsupported WAV: format ${fmt.format}, ${fmt.bits}-bit`);
+      const bytes = fmt.bits / 8;
+      const frames = Math.floor(Math.min(size, buf.length - body) / (bytes * fmt.channels));
+      const samples = new Float32Array(frames);
+      for (let i = 0; i < frames; i++) {
+        let sum = 0;
+        for (let c = 0; c < fmt.channels; c++) {
+          const at = body + (i * fmt.channels + c) * bytes;
+          sum += float ? buf.readFloatLE(at) : buf.readInt16LE(at) / 0x8000;
+        }
+        samples[i] = sum / fmt.channels;
+      }
+      return { samples, sampleRate: fmt.sampleRate };
+    }
+    pos = body + size + (size % 2);
+  }
+  throw new Error('WAV has no fmt/data chunk');
+}

@@ -34,6 +34,22 @@ export class EmptySpeech extends Error {
  * @param {Parameters<typeof createVoiceEngine>[1]} [deps]
  */
 export function createVoiceEngineFromConfig(config, deps) {
+  if (config.voiceboxUrl && config.voiceboxProfile) {
+    return createVoiceEngine(
+      {
+        enabled: config.voiceEnabled === true,
+        voicebox: { url: config.voiceboxUrl, profileId: config.voiceboxProfile },
+        voice: `voicebox:${config.voiceboxProfile}`,
+        speed: 1,
+        pitch: 1,
+        model: 'voicebox-chatterbox_turbo',
+        dtype: 'clarity1',
+        cacheDir: config.voiceCacheDir,
+        cacheMaxBytes: (config.voiceCacheMaxMb ?? 500) * 1024 * 1024,
+      },
+      deps,
+    );
+  }
   return createVoiceEngine(
     {
       enabled: config.voiceEnabled === true,
@@ -78,12 +94,15 @@ export function audioPath(id) {
  *   loadBackend?: (settings: object) => Promise<{sampleRate: number, synthesize: (text: string, o: object) => Promise<Float32Array>}>,
  *   cache?: ReturnType<typeof createAudioCache>,
  *   now?: () => number,
- * }} [deps] loadBackend defaults to Kokoro (dynamically imported)
+ * }} [deps] loadBackend defaults to Voicebox when settings.voicebox is set, else Kokoro (dynamically imported)
  */
 export function createVoiceEngine(settings, deps = {}) {
   const log = deps.logger || { info() {}, warn() {}, error() {} };
   const now = deps.now || (() => performance.now());
-  const loadBackend = deps.loadBackend || (async (s) => (await import('./kokoro.js')).loadKokoro(s));
+  const loadBackend =
+    deps.loadBackend ||
+    (async (s) =>
+      s.voicebox ? (await import('./voicebox.js')).loadVoicebox(s.voicebox) : (await import('./kokoro.js')).loadKokoro(s));
   const cache =
     deps.cache || createAudioCache({ dir: settings.cacheDir, maxBytes: settings.cacheMaxBytes, logger: log });
   const engineVersion = `${settings.model}|${settings.dtype}|n${NORMALIZER_VERSION}|v2`;

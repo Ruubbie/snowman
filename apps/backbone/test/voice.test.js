@@ -7,7 +7,9 @@ import { buildApp } from '../src/app.js';
 import { sha256Hex } from '../src/core/auth.js';
 import { loadConfig } from '../src/config.js';
 import { normalizeForSpeech, splitSentences, numberToWords } from '../src/voice/text.js';
-import { encodeWav, wavDurationMs } from '../src/voice/wav.js';
+import { encodeWav, wavDurationMs, decodeWav } from '../src/voice/wav.js';
+import { clarity } from '../src/voice/clarity.js';
+import { loadVoicebox } from '../src/voice/voicebox.js';
 import { createVoiceEngine, VoiceUnavailable } from '../src/voice/engine.js';
 import { createAudioCache } from '../src/voice/cache.js';
 import { parseVoiceRecipe, resamplePitch } from '../src/voice/resample.js';
@@ -420,4 +422,50 @@ test('encodeWav scales loud clips down instead of hard-clipping', async () => {
   const s = [0, 1, 2].map((i) => wav.readInt16LE(44 + i * 2) / 0x8000);
   assert.ok(Math.abs(Math.min(...s)) < 0.96 && Math.max(...s) < 0.96);
   assert.ok(s[0] > 0 && s[0] < 0.5, 'quiet samples shrink by the same gain');
+});
+
+test('decodeWav reads back what encodeWav wrote', () => {
+  const tone = Float32Array.from({ length: 2400 }, (_, i) => 0.5 * Math.sin(i / 10));
+  const { samples, sampleRate } = decodeWav(encodeWav(tone, { sampleRate: 24000 }));
+  assert.equal(sampleRate, 24000);
+  assert.equal(samples.length, tone.length);
+  assert.ok(Math.abs(samples[100] - tone[100]) < 1e-3);
+});
+
+test('clarity removes DC/rumble and keeps length', () => {
+  const dc = new Float32Array(24000).fill(0.5);
+  const out = clarity(dc, 24000);
+  assert.equal(out.length, dc.length);
+  assert.ok(Math.abs(out.at(-1)) < 1e-3, 'constant offset is filtered out');
+});
+
+test('loadVoicebox generates, waits for the status stream, decodes and cleans up', async () => {
+  const calls = [];
+  const wav = encodeWav(new Float32Array(2400).fill(0.1), { sampleRate: 24000 });
+  const fakeFetch = async (url, opts = {}) => {
+    calls.push(`${opts.method || 'GET'} ${url.replace('http://vb', '')}`);
+    if (url.endsWith('/generate')) {
+      assert.deepEqual(JSON.parse(opts.body), { profile_id: 'p1', text: 'Hi there.', engine: 'chatterbox_turbo', language: 'en' });
+      return Response.json({ id: 'g1', status: 'generating' });
+    }
+    if (url.endsWith('/status')) return new Response('data: {"status": "generating"}\n\ndata: {"status": "completed"}\n\n');
+    if (url.endsWith('/audio/g1')) return new Response(wav);
+    return Response.json({});
+  };
+  const vb = await loadVoicebox({ url: 'http://vb/', profileId: 'p1', fetch: fakeFetch });
+  const audio = await vb.synthesize('Hi there.');
+  assert.equal(audio.length, 2400);
+  assert.equal(vb.sampleRate, 24000);
+  assert.deepEqual(calls, ['GET /health', 'GET /profiles/p1', 'POST /generate', 'GET /generate/g1/status', 'GET /audio/g1', 'DELETE /history/g1']);
+});
+
+test('loadVoicebox surfaces a failed generation', async () => {
+  const fakeFetch = async (url) =>
+    url.endsWith('/generate')
+      ? Response.json({ id: 'g2' })
+      : url.endsWith('/status')
+        ? new Response('data: {"status": "failed", "error": "boom"}\n\n')
+        : Response.json({});
+  const vb = await loadVoicebox({ url: 'http://vb', profileId: 'p1', fetch: fakeFetch });
+  await assert.rejects(vb.synthesize('Hi.'), /failed: boom/);
 });
