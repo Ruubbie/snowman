@@ -111,7 +111,7 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     runClientId = (options["runClientId"] as? String) ?? UUID().uuidString
     sessionId = options["sessionId"] as? String
     segments = ((options["segments"] as? [[String: Any]]) ?? []).map {
-      RunSegment(kind: $0["kind"] as? String ?? "run", seconds: $0["seconds"] as? Int ?? 0)
+      RunSegment(kind: $0["kind"] as? String ?? "run", seconds: intValue($0["seconds"]) ?? 0)
     }
 
     var t = 0.0
@@ -142,6 +142,7 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     events.removeAll()
 
     startedAt = Date()
+    resumedAt = startedAt // the clock only counts while resumedAt is set
     let store = RunStore(runClientId: runClientId)
     store.begin(meta: [
       "runClientId": runClientId,
@@ -253,10 +254,10 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     let targetsRaw = (brief?["targets"] as? [[String: Any]]) ?? []
     cues.targets = targetsRaw.map { t in
       CueTarget(
-        segmentIndex: t["segment_index"] as? Int ?? 0,
+        segmentIndex: intValue(t["segment_index"]) ?? 0,
         kind: t["kind"] as? String ?? "",
-        paceMinSPerKm: t["pace_min_s_per_km"] as? Int,
-        paceMaxSPerKm: t["pace_max_s_per_km"] as? Int
+        paceMinSPerKm: intValue(t["pace_min_s_per_km"]),
+        paceMaxSPerKm: intValue(t["pace_max_s_per_km"])
       )
     }
 
