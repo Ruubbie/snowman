@@ -10,7 +10,9 @@ const emitter = RunTrackerNative ? new EventEmitter(RunTrackerNative) : null;
 export const isAvailable = !!RunTrackerNative;
 
 export function configure(options) {
-  return RunTrackerNative?.configure(options);
+  if (!RunTrackerNative) return;
+  const { baseUrl = null, token = null } = options || {};
+  return RunTrackerNative.configure({ baseUrl, token });
 }
 
 export async function prepare() {

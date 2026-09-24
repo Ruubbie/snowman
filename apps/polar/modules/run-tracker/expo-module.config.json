@@ -1,6 +1,6 @@
 {
-  "platforms": ["ios"],
-  "ios": {
-    "modulesClassNames": ["RunTrackerModule"]
+  "platforms": ["apple"],
+  "apple": {
+    "modules": ["RunTrackerModule"]
   }
 }

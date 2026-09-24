@@ -37,6 +37,8 @@ export default function Run() {
   const [toastVisible, setToastVisible] = useState(false);
   const [locked, setLocked] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Blocking problem that makes real tracking impossible (never fall back to fake data).
+  const [trackerError, setTrackerError] = useState(tracker.unavailableReason);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -59,7 +61,12 @@ export default function Run() {
         setLastCue(cue);
         setToastVisible(true);
       });
-      stateSub = tracker.addListener('state', (s) => setRunState(s.state));
+      stateSub = tracker.addListener('state', (s) => {
+        if (s.error === 'location_denied') {
+          setTrackerError('Polar has no location access. Open Settings › Polar › Location and choose "Always", then try again.');
+        }
+        setRunState(s.state);
+      });
       gpsSub = tracker.addListener('gps', (g) => setGpsAccuracy(g.accuracy_m));
 
       if (sessionId && !brief) {
@@ -89,11 +96,17 @@ export default function Run() {
 
   const runStartedRef = useRef(false);
   const startRun = useCallback(async () => {
-    if (!isReady) return;
+    if (!isReady || trackerError) return;
     runStartedRef.current = true;
     setRunState('running');
-    await tracker.start({ sessionId, runClientId, segments, brief });
-  }, [isReady, sessionId, runClientId, segments, brief]);
+    try {
+      await tracker.start({ sessionId, runClientId, segments, brief });
+    } catch (err) {
+      runStartedRef.current = false;
+      setRunState('ready');
+      setTrackerError(err?.message || 'The run could not start.');
+    }
+  }, [isReady, trackerError, sessionId, runClientId, segments, brief]);
 
   const handlePauseResume = useCallback(() => {
     if (locked) return;
@@ -129,7 +142,9 @@ export default function Run() {
         <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 10, paddingBottom: 30 }}>
           <View style={{ alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <IconButton icon={isReady ? 'x' : 'chevron-down'} variant="plain" label={isReady ? 'Cancel' : 'Minimise'} onPress={() => router.back()} disabled={locked} />
-            {isReady ? (
+            {tracker.isSimulator ? (
+              <Badge tone="warning">Simulated</Badge>
+            ) : isReady ? (
               <Badge tone="neutral">Ready</Badge>
             ) : runState === 'paused' ? (
               <Badge tone="warning" dot>Paused</Badge>
@@ -179,7 +194,12 @@ export default function Run() {
             <Metric label="Cadence" value={snapshot.cadence_spm ? Math.round(snapshot.cadence_spm) : '–'} unit="spm" align="center" size={32} />
           </View>
 
-          {isReady ? (
+          {isReady && trackerError ? (
+            <View style={{ marginTop: 'auto', alignSelf: 'stretch', gap: 8, padding: 16, borderLeftWidth: 3, borderLeftColor: c.danger || c.accent, backgroundColor: c.surface }}>
+              <Text variant="eyebrow" style={{ color: c.danger || c.accent }}>Can't track this run</Text>
+              <Text variant="body">{trackerError}</Text>
+            </View>
+          ) : isReady ? (
             <View style={{ marginTop: 'auto', alignItems: 'center', gap: 14 }}>
               <IconButton icon="play" variant="solid" label="Start" size={80} iconSize={30} onPress={startRun} />
               <Text variant="eyebrow" muted>Tap to start</Text>

@@ -58,6 +58,20 @@ jobs:
         working-directory: apps/polar/ios
         run: pod install --repo-update
 
+      - name: Check native RunTracker is linked
+        working-directory: apps/polar/ios
+        run: |
+          set -euo pipefail
+          # A build without it silently can't track runs - fail loudly instead.
+          grep -q "RunTracker" Podfile.lock || { echo "::error::RunTracker pod missing from Podfile.lock"; exit 1; }
+          provider=$(find . -name ExpoModulesProvider.swift -not -path "./build/*" | head -1)
+          if [ -n "$provider" ]; then
+            grep -q "RunTrackerModule" "$provider" || { echo "::error::RunTrackerModule not registered in $provider"; exit 1; }
+            echo "::notice::RunTracker linked and registered"
+          else
+            echo "::notice::RunTracker pod linked (module provider is generated during the build)"
+          fi
+
       - name: Build (unsigned; SideStore signs it on your phone)
         working-directory: apps/polar/ios
         run: |

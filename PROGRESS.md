@@ -33,6 +33,12 @@ The Source Control panel (`Ctrl+Shift+G`) shows every file that changed.
 - [x] GitHub Actions: unsigned IPA build → release for SideStore
 - [x] README: install Polar on iPhone
 
+## Next up (agreed 2026-09-24, in this order)
+- [ ] **Fix real tracking on iPhone.** The first real walk used the web simulator: `apps/polar/modules/run-tracker` has no `.podspec`, so the native RunTracker module was never compiled in and `src/tracker/index.js` silently fell back to `simulator.js`. Fix: add podspec, never use the simulator on a device (show a clear error instead), confirm in CI that the module is linked, and give the user a home test checklist before the next walk.
+- [ ] **Stop wasted AI calls.** Each app refresh triggers a new Olaf call for the Today message. Cache per session/day on the server and only regenerate when something changes.
+- [ ] **Desktop dashboard (Electron).** View everything collected: conversations with Olaf, workouts (routes, samples, cues), plan decisions, AI usage and costs. Delete test/false data (runs incl. samples/events/cues, conversations).
+- [ ] **Server voice engine (TTS).** The server generates Olaf's audio so the voice is identical on every device and sounds human. Choose between a local model on the Oracle server (e.g. Kokoro/Piper, free, check speed on 2 Arm cores) and a paid API; cache audio for repeated lines.
+
 ## Step 3 — Olaf everywhere (later)
 - [ ] Olaf's character (persona)
 - [ ] Desktop overlay (Electron)
