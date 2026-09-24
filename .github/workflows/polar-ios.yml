@@ -68,11 +68,12 @@ jobs:
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             # Surface compiler errors as annotations (readable without downloading the log).
-            { grep -iE "error[: ]|failed|exception|cannot find|unable to resolve" xcodebuild.log | grep -viE "warning|-Werror|error_handler|errors\.swift|onerror" | tail -30; } | while IFS= read -r line; do
+            # GitHub keeps max 10 annotations per level per step, so only real compiler/script errors.
+            { grep -E ": error: |^error: |fatal error:|Error: |nonzero exit code" xcodebuild.log | sort -u | head -10; } | while IFS= read -r line; do
               echo "::error::${line:0:900}"
             done
-            # Also keep the tail of the log as an artifact-free summary.
-            tail -60 xcodebuild.log | grep -vE "^\s*$" | tail -15 | while IFS= read -r line; do
+            # The "following build commands failed" summary names the failing target/phase.
+            sed -n '/The following build commands failed/,$p' xcodebuild.log | head -10 | while IFS= read -r line; do
               echo "::warning::${line:0:900}"
             done
             exit "$status"
