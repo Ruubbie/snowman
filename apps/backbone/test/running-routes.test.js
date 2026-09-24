@@ -51,8 +51,11 @@ function fakeRunningRepo() {
     async getRecentPlanDecisions() {
       return [];
     },
-    async insertBrief(sessionId, brief, model) {
-      briefs.set(sessionId, { brief, model });
+    async getBrief(sessionId) {
+      return briefs.get(sessionId) || null;
+    },
+    async insertBrief(sessionId, brief, model, inputHash = null) {
+      briefs.set(sessionId, { brief, model, inputHash });
     },
     async insertCue(cue) {
       cues.push(cue);
@@ -64,7 +67,8 @@ function fakeRunningRepo() {
 }
 
 function fakeBrainWith(response) {
-  return { available: true, async createMessage() { return response; } };
+  const calls = [];
+  return { available: true, calls, async createMessage(req) { calls.push(req); return response; } };
 }
 
 function buildTestApp({ brain, runningRepo }) {
@@ -129,6 +133,18 @@ test('POST /v1/running/brief returns Olaf structured output and stores it', asyn
   assert.equal(body.sessionId, sessionId);
   assert.deepEqual(body.brief, briefJson);
   assert.deepEqual(runningRepo.briefs.get(sessionId).brief, briefJson);
+
+  // Same inputs again (e.g. the Today screen refreshing): stored brief, no second Olaf call.
+  const again = await app.inject({
+    method: 'POST',
+    url: '/v1/running/brief',
+    headers: { authorization: `Bearer ${TEST_TOKEN}` },
+    payload: { sessionId },
+  });
+  assert.equal(again.statusCode, 200);
+  assert.equal(again.json().cached, true);
+  assert.deepEqual(again.json().brief, briefJson);
+  assert.equal(brain.calls.length, 1);
 });
 
 test('POST /v1/running/brief returns 404 for an unknown session', async () => {

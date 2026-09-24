@@ -303,17 +303,18 @@ export function createRunningRepo(pool) {
 
     // --- briefs / cues / decisions / reminders --------------------------
     async getBrief(sessionId) {
-      const [rows] = await pool.query('SELECT brief, model, created_at FROM run_briefs WHERE session_id = ?', [
+      const [rows] = await pool.query('SELECT brief, model, input_hash, created_at FROM run_briefs WHERE session_id = ?', [
         sessionId,
       ]);
       if (!rows.length) return null;
-      return { brief: parseJsonColumn(rows[0].brief, {}), model: rows[0].model, createdAt: rows[0].created_at };
+      return { brief: parseJsonColumn(rows[0].brief, {}), model: rows[0].model, inputHash: rows[0].input_hash, createdAt: rows[0].created_at };
     },
-    async insertBrief(sessionId, brief, model) {
+    async insertBrief(sessionId, brief, model, inputHash = null) {
       await pool.query(
-        `INSERT INTO run_briefs (session_id, brief, model, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP(3))
-         ON DUPLICATE KEY UPDATE brief = VALUES(brief), model = VALUES(model), created_at = UTC_TIMESTAMP(3)`,
-        [sessionId, JSON.stringify(brief), model],
+        `INSERT INTO run_briefs (session_id, brief, model, input_hash, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))
+         ON DUPLICATE KEY UPDATE brief = VALUES(brief), model = VALUES(model), input_hash = VALUES(input_hash),
+           created_at = UTC_TIMESTAMP(3)`,
+        [sessionId, JSON.stringify(brief), model, inputHash],
       );
     },
     async insertCue(cue) {

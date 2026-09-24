@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { addDays, localDateString, zonedTimeToUtc, EVENTS, RUNNING_CARD_KINDS, runUploadBodySchema, runSamplesChunkBodySchema } from '@snowman/shared';
 import { createRunningRepo } from './repo.js';
 import { materialize } from './planner.js';
@@ -297,21 +298,38 @@ export function registerRoutes(app, ctx) {
     '/v1/running/brief',
     {
       schema: {
-        body: { type: 'object', additionalProperties: false, required: ['sessionId'], properties: { sessionId: { type: 'string' } } },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['sessionId'],
+          properties: { sessionId: { type: 'string' }, force: { type: 'boolean' } },
+        },
       },
     },
     async (request, reply) => {
       const session = await repo.getSessionById(request.body.sessionId);
       if (!session) return reply.code(404).send({ error: 'not_found' });
-      if (!ctx.brain.available) return reply.code(503).send({ error: 'olaf_unavailable' });
 
-      const [settings, recentRuns, recentDecisions] = await Promise.all([
+      const [settings, recentRuns, recentDecisions, stored] = await Promise.all([
         repo.getSettings(),
         repo.getRecentRuns(10),
         repo.getRecentPlanDecisions(10),
+        repo.getBrief(session.id),
       ]);
-      const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
       const prompt = buildBriefPrompt(session, settings, recentRuns, recentDecisions);
+      // Same inputs (session, settings, runs, decisions, persona, model) -> reuse the stored brief, no AI call.
+      const inputHash = createHash('sha256')
+        .update([ctx.config.olafModelSmart, ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, prompt].join('\n'))
+        .digest('hex');
+      if (stored && stored.inputHash === inputHash && !request.body.force) {
+        return { sessionId: session.id, brief: stored.brief, cached: true };
+      }
+      if (!ctx.brain.available) {
+        // Olaf offline: an older brief is better than none.
+        if (stored) return { sessionId: session.id, brief: stored.brief, cached: true, stale: true };
+        return reply.code(503).send({ error: 'olaf_unavailable' });
+      }
+      const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
 
       try {
         const { data } = await ctx.brainAgent.structured(
@@ -319,7 +337,7 @@ export function registerRoutes(app, ctx) {
           { model: ctx.config.olafModelSmart, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 2000 },
           BRIEF_SCHEMA,
         );
-        await repo.insertBrief(session.id, data, ctx.config.olafModelSmart);
+        await repo.insertBrief(session.id, data, ctx.config.olafModelSmart, inputHash);
         return { sessionId: session.id, brief: data };
       } catch (err) {
         if (ctx.sendOlafError(reply, err)) return reply;
