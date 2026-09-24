@@ -6,7 +6,7 @@ const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 /**
  * Load Olaf's persona text: PERSONA_FILE if set (relative to the backbone
- * app root), else data/persona.md, falling back to the committed placeholder
+ * app root), else the repo's data/persona.md (gitignored, personal), falling back to the committed placeholder
  * at config/persona.example.md when neither exists yet.
  * @param {{personaFile?: string}} config
  * @param {{root?: string}} [opts]
@@ -16,7 +16,7 @@ export async function loadPersona(config, opts = {}) {
   const root = opts.root || APP_ROOT;
   const primary = config.personaFile
     ? path.resolve(root, config.personaFile)
-    : path.join(root, 'data', 'persona.md');
+    : path.join(root, '..', '..', 'data', 'persona.md');
   try {
     return await readFile(primary, 'utf8');
   } catch (err) {
