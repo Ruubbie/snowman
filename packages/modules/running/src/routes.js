@@ -43,6 +43,15 @@ function buildTodayCards(session) {
   return [{ kind: RUNNING_CARD_KINDS.PLANNED_RUN, fallbackText: session.summary, data: session }];
 }
 
+/** Olaf nudging, a bit harder each time: first call, second call, last call. */
+function reminderBody(summary, nth) {
+  return [
+    `${summary}. Shoes on? I'm ready when you are!`,
+    `Still waiting by the door! ${summary}. Let's go!`,
+    `Last call! ${summary} before the day is over. Up you get!`,
+  ][nth];
+}
+
 /**
  * Compute (but do not persist) local-notification specs for the next N
  * days: up to 3 per non-rest, not-yet-done day (reminder_hour, +2h if
@@ -64,7 +73,7 @@ export function buildReminderSpecs(sessions, settings, tzName) {
         id: `${session.id}-${hour}`,
         fireAt: fireAt.toISOString(),
         title: session.title,
-        body: hour === 21 ? `Last call: ${session.summary}` : session.summary,
+        body: reminderBody(session.summary, hour === uniqueHours[0] ? 0 : hour === 21 ? 2 : 1),
         sessionId: session.id,
       });
     }
@@ -81,6 +90,9 @@ function buildBriefPrompt(session, settings, recentRuns, recentDecisions) {
     'Write a pre-run brief as the required JSON: focus points, an opening line, per-segment pace targets ' +
       '(segment_index/kind/pace_min_s_per_km/pace_max_s_per_km/feel), and fallback_lines for ' +
       'too_fast/too_slow/to_run/to_walk/km_split/halfway/finish/encourage. Lines must be specific to this run.',
+    'The fallback lines are recorded in advance and played word for word at those moments during the run, ' +
+      'so they are all the runner hears: use the planned paces and durations from the targets (e.g. "aim for 6:30 per ' +
+      'kilometre", "one minute of walking"), never numbers you cannot know in advance like the actual split.',
   ].join('\n\n');
 }
 

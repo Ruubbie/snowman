@@ -169,6 +169,8 @@ final class CueEngine {
   /// time the switch happens. Allowed to run even if another request is
   /// in flight (the one exception to the single-in-flight rule).
   func prefetchSegmentSwitch(nextIndex: Int, snapshot: [String: Any]) {
+    // The brief's pre-made switch lines are used instead (Olaf's own voice).
+    if !(fallback?.toRun ?? "").isEmpty && !(fallback?.toWalk ?? "").isEmpty { return }
     guard prefetchedForSegmentIndex != nextIndex else { return }
     prefetchedForSegmentIndex = nextIndex
     prefetchedSay = nil
@@ -199,6 +201,11 @@ final class CueEngine {
   }
 
   private func trigger(_ trigger: String, snapshot: [String: Any]) {
+    // Pre-made brief lines win: they play in Olaf's own voice, live lines can't.
+    if let line = fallbackLine(for: trigger), !line.isEmpty {
+      speakFallback(for: trigger)
+      return
+    }
     guard !inFlight else { return }
     inFlight = true
     postCue(trigger: trigger, snapshot: buildSnapshot(base: snapshot)) { [weak self] say in

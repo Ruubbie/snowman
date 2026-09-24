@@ -68,6 +68,9 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     manager.pausesLocationUpdatesAutomatically = false
 
     cues.speak = { [weak self] text in self?.voice.say(text) }
+    voice.onClips = { [weak self] ready, total in
+      self?.onEvent?("clips", ["ready": ready, "total": total])
+    }
     cues.onCue = { [weak self] text, trigger, source in
       self?.onEvent?("cue", ["text": text, "trigger": trigger, "source": source])
     }

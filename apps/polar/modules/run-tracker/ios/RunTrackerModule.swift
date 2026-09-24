@@ -20,7 +20,7 @@ public class RunTrackerModule: Module {
   public func definition() -> ModuleDefinition {
     Name("RunTracker")
 
-    Events("tick", "cue", "state", "gps")
+    Events("tick", "cue", "state", "gps", "clips")
 
     // CLLocationManager and Timer both need to live on a thread whose run
     // loop is actively spinning - guaranteed true for the main thread, not

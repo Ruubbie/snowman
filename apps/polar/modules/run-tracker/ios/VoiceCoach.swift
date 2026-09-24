@@ -10,6 +10,8 @@ final class VoiceCoach: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
   private lazy var preferredVoice: AVSpeechSynthesisVoice? = Self.bestEnglishVoice()
   private var clips: [String: URL] = [:] // spoken text -> downloaded clip
   private var pending: Set<String> = []
+  /// (ready, total) whenever a clip download starts or lands.
+  var onClips: ((Int, Int) -> Void)?
   private var player: AVAudioPlayer?
 
   override init() {
@@ -25,6 +27,7 @@ final class VoiceCoach: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     for (text, path) in lines where clips[text] == nil && !pending.contains(text) {
       guard let url = URL(string: baseUrl + path) else { continue }
       pending.insert(text)
+      onClips?(clips.count, clips.count + pending.count)
       var request = URLRequest(url: url, timeoutInterval: 600)
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       URLSession.shared.downloadTask(with: request) { [weak self] tmp, response, _ in
@@ -37,6 +40,7 @@ final class VoiceCoach: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         DispatchQueue.main.async {
           self?.pending.remove(text)
           if let file { self?.clips[text] = file }
+          if let self { self.onClips?(self.clips.count, self.clips.count + self.pending.count) }
         }
       }.resume()
     }

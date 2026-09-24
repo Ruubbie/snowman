@@ -32,6 +32,7 @@ export default function Run() {
   // 'ready' until the user taps Start: GPS warms up and Olaf's brief loads, nothing is recorded yet.
   const [runState, setRunState] = useState('ready');
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [clips, setClips] = useState(null); // {ready, total}: Olaf's pre-made lines downloading
   const isReady = runState === 'ready';
   const [lastCue, setLastCue] = useState(null);
   const [toastVisible, setToastVisible] = useState(false);
@@ -45,7 +46,7 @@ export default function Run() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    let tickSub, cueSub, stateSub, gpsSub;
+    let tickSub, cueSub, stateSub, gpsSub, clipsSub;
     (async () => {
       const baseUrl = (await tokenStore.getServerUrl()) || 'http://127.0.0.1:4000';
       const token = await tokenStore.getToken();
@@ -69,6 +70,7 @@ export default function Run() {
         setRunState(s.state);
       });
       gpsSub = tracker.addListener('gps', (g) => setGpsAccuracy(g.accuracy_m));
+      clipsSub = tracker.addListener('clips', setClips);
 
       if (sessionId && !brief) {
         client.running
@@ -91,6 +93,7 @@ export default function Run() {
       cueSub?.remove();
       stateSub?.remove();
       gpsSub?.remove();
+      clipsSub?.remove();
       if (!runStartedRef.current) tracker.cancel();
     };
   }, []);
@@ -208,6 +211,13 @@ export default function Run() {
             <View style={{ marginTop: 'auto', alignItems: 'center', gap: 14 }}>
               <IconButton icon="play" variant="solid" label="Start" size={80} iconSize={30} onPress={startRun} />
               <Text variant="eyebrow" muted>Tap to start</Text>
+              {clips?.total > 0 && (
+                <Text variant="dataMedium" muted>
+                  {clips.ready < clips.total
+                    ? `Olaf is recording your lines · ${clips.ready} of ${clips.total}`
+                    : "Olaf's voice is ready"}
+                </Text>
+              )}
             </View>
           ) : (
           <View style={{ marginTop: 'auto', flexDirection: 'row', gap: 28, alignItems: 'center' }}>

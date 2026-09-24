@@ -20,6 +20,10 @@ export async function refreshReminders() {
   const Notifications = await getNotifications();
   if (!Notifications) return { scheduled: 0 };
 
+  // Ask once (iOS only shows the prompt the first time); Settings can ask again.
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status === 'undetermined') await Notifications.requestPermissionsAsync();
+
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   const client = await getClient();
