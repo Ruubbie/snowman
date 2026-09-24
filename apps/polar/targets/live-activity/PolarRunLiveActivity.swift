@@ -56,9 +56,6 @@ struct PolarRunLiveActivity: Widget {
       } minimal: {
         SquareDot()
       }
-      .widgetLabel {
-        SegmentIndicator(state: context.state)
-      }
     }
   }
 }
