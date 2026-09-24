@@ -68,8 +68,12 @@ jobs:
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             # Surface compiler errors as annotations (readable without downloading the log).
-            grep -E "(error|fatal error):" xcodebuild.log | sort -u | head -25 | while IFS= read -r line; do
+            { grep -iE "error[: ]|failed|exception|cannot find|unable to resolve" xcodebuild.log | grep -viE "warning|-Werror|error_handler|errors\.swift|onerror" | tail -30; } | while IFS= read -r line; do
               echo "::error::${line:0:900}"
+            done
+            # Also keep the tail of the log as an artifact-free summary.
+            tail -60 xcodebuild.log | grep -vE "^\s*$" | tail -15 | while IFS= read -r line; do
+              echo "::warning::${line:0:900}"
             done
             exit "$status"
           fi
