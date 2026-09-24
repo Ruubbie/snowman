@@ -12,7 +12,7 @@ public class RunTrackerModule: Module {
   private lazy var controller: RunSessionController = {
     let controller = RunSessionController()
     controller.onEvent = { [weak self] name, body in
-      self?.sendEvent(name, body)
+      self?.sendEvent(name, body ?? [:])
     }
     return controller
   }()

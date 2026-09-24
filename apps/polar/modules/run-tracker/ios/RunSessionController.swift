@@ -196,7 +196,7 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     cues.onResume(snapshot: buildSnapshot())
     startTimer()
     let seg = currentSegment
-    let endsAt = seg.map { Date().addingTimeInterval(segmentRemainingS()) }
+    let endsAt = seg.map { _ in Date().addingTimeInterval(segmentRemainingS()) }
     liveActivity.update(
       segmentKind: seg?.kind ?? "run", segmentIndex: segmentIndex, segmentEndsAt: endsAt,
       distanceM: distanceM, paceSPerKm: nil, isPaused: false, force: true
@@ -217,7 +217,7 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
     }
     phase = .finished
     onEvent?("state", ["state": Phase.finished.rawValue])
-    liveActivity.end(distanceM: distanceM, paceSPerKm: averagePaceSPerKm())
+    liveActivity.end(distanceM: distanceM, paceSPerKm: averagePaceSPerKm().map(Double.init))
 
     store?.markFinished()
     store?.close()
