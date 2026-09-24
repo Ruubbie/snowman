@@ -14,3 +14,6 @@ apps/polar/web-build/
 .claude/
 apps/polar/ios/
 apps/polar/android/
+
+# desktop renderer build output
+apps/desktop/dist/

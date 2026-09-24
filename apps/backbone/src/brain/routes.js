@@ -13,10 +13,10 @@ const STABLE_INSTRUCTIONS =
  */
 export function createConversationRepo(pool) {
   return {
-    async create(id) {
+    async create(id, deviceId = null) {
       await pool.query(
-        'INSERT INTO conversations (id, created_at, updated_at) VALUES (?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))',
-        [id],
+        'INSERT INTO conversations (id, device_id, created_at, updated_at) VALUES (?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))',
+        [id, deviceId],
       );
     },
     async loadMessages(id) {
@@ -98,7 +98,7 @@ export function registerOlafRoutes(app, ctx) {
         history = await conversationRepo.loadMessages(conversationId);
       } else {
         conversationId = crypto.randomUUID();
-        await conversationRepo.create(conversationId);
+        await conversationRepo.create(conversationId, request.device?.id ?? null);
       }
 
       const startLen = history.length;

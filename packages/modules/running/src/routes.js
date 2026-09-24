@@ -149,6 +149,25 @@ const CUE_SCHEMA = {
   properties: { say: { type: ['string', 'null'] } },
 };
 
+/**
+ * Pre-synthesise the brief's spoken lines in the background (low priority)
+ * and return their deterministic audio ids/urls right away. null when the
+ * server voice is off/unavailable - the phone then uses on-device speech.
+ * @param {{enqueue: (text: string, o?: object) => ({id: string, url: string}|null)}|undefined} voice
+ * @param {{opening_line?: string, fallback_lines?: Record<string, string>}} brief
+ */
+export function briefAudio(voice, brief) {
+  if (!voice?.enabled || !brief) return null;
+  // Opening line first: it is the first thing the runner hears.
+  const opening_line = typeof brief.opening_line === 'string' ? voice.enqueue(brief.opening_line) : null;
+  const fallback_lines = {};
+  for (const [key, text] of Object.entries(brief.fallback_lines || {})) {
+    fallback_lines[key] = typeof text === 'string' ? voice.enqueue(text) : null;
+  }
+  if (!opening_line && Object.values(fallback_lines).every((v) => !v)) return null;
+  return { opening_line, fallback_lines };
+}
+
 const CUE_TRIGGERS = [
   'segment_upcoming',
   'too_fast',
@@ -322,11 +341,13 @@ export function registerRoutes(app, ctx) {
         .update([ctx.config.olafModelSmart, ctx.persona || '', STABLE_BRIEF_INSTRUCTIONS, prompt].join('\n'))
         .digest('hex');
       if (stored && stored.inputHash === inputHash && !request.body.force) {
-        return { sessionId: session.id, brief: stored.brief, cached: true };
+        return { sessionId: session.id, brief: stored.brief, cached: true, audio: briefAudio(ctx.voice, stored.brief) };
       }
       if (!ctx.brain.available) {
         // Olaf offline: an older brief is better than none.
-        if (stored) return { sessionId: session.id, brief: stored.brief, cached: true, stale: true };
+        if (stored) {
+          return { sessionId: session.id, brief: stored.brief, cached: true, stale: true, audio: briefAudio(ctx.voice, stored.brief) };
+        }
         return reply.code(503).send({ error: 'olaf_unavailable' });
       }
       const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_BRIEF_INSTRUCTIONS, clock, tzName);
@@ -338,7 +359,7 @@ export function registerRoutes(app, ctx) {
           BRIEF_SCHEMA,
         );
         await repo.insertBrief(session.id, data, ctx.config.olafModelSmart, inputHash);
-        return { sessionId: session.id, brief: data };
+        return { sessionId: session.id, brief: data, audio: briefAudio(ctx.voice, data) };
       } catch (err) {
         if (ctx.sendOlafError(reply, err)) return reply;
         request.log.error({ err }, 'running brief failed');
@@ -379,11 +400,12 @@ export function registerRoutes(app, ctx) {
           CUE_SCHEMA,
         );
         await repo.insertCue({ runClientId, sessionId, elapsedS: snapshot.elapsed_s ?? 0, trigger, text: data.say, source: 'live' });
-        return { say: data.say };
+        // Queued ahead of any brief pre-synthesis; the client's GET on audio.url waits for it.
+        return { say: data.say, audio: data.say ? (ctx.voice?.enqueue(data.say, { priority: 'high' }) ?? null) : null };
       } catch (err) {
         await repo.insertCue({ runClientId, sessionId, elapsedS: snapshot.elapsed_s ?? 0, trigger, text: null, source: 'fallback' });
         if (ctx.sendOlafError(reply, err)) return reply;
-        return { say: null };
+        return { say: null, audio: null };
       }
     },
   );

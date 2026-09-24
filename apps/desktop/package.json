@@ -1,0 +1,26 @@
+{
+  "name": "@snowman/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Snowman desktop: the dashboard window now, the Olaf overlay later (same main process).",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:web": "vite",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "electron": "electron ."
+  },
+  "dependencies": {
+    "@snowman/sdk": "*",
+    "lucide-react": "^1.48.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.5",
+    "vite": "^8.3.1"
+  }
+}

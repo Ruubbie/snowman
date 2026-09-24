@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerRoutes, registerJobs } from './routes.js';
 import { runningTools } from './tools.js';
+import { registerAdminRoutes } from './adminRoutes.js';
 
 const MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 
@@ -12,6 +13,7 @@ const runningModule = {
   tools: runningTools,
   register(app, ctx) {
     registerRoutes(app, ctx);
+    registerAdminRoutes(app, ctx);
     registerJobs(ctx);
   },
 };
@@ -24,4 +26,6 @@ export * from './import.js';
 export * from './importRunner.js';
 export * from './analysis.js';
 export { createRunningRepo } from './repo.js';
+export { createRunningAdminRepo } from './adminRepo.js';
+export { runSource, suspectFlags, decorateRun } from './adminDerive.js';
 export { runningTools } from './tools.js';

@@ -38,6 +38,8 @@ jobs:
           cache: npm
 
       - name: Install JS dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1 # the desktop app's Electron isn't needed for an iOS build
         run: npm ci
 
       - name: Expo prebuild (generate ios/ project, incl. the Live Activity target)

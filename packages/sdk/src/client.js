@@ -75,10 +75,59 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
     settings: (body) => request('/v1/running/settings', { method: 'PUT', body }),
   };
 
+  const id = (v) => encodeURIComponent(v);
+  // Desktop dashboard (Olaf's home): core data under /v1/admin, each module under /v1/admin/<module>.
+  const admin = {
+    overview: () => request('/v1/admin/overview'),
+    conversations: ({ limit, offset } = {}) => request('/v1/admin/conversations', { query: { limit, offset } }),
+    conversation: (conversationId) => request(`/v1/admin/conversations/${id(conversationId)}`),
+    deleteConversation: (conversationId) => request(`/v1/admin/conversations/${id(conversationId)}`, { method: 'DELETE' }),
+    aiUsage: ({ limit, offset } = {}) => request('/v1/admin/ai-usage', { query: { limit, offset } }),
+    events: ({ limit, offset, type } = {}) => request('/v1/admin/events', { query: { limit, offset, type } }),
+    devices: () => request('/v1/admin/devices'),
+    revokeDevice: (deviceId) => request(`/v1/admin/devices/${id(deviceId)}`, { method: 'DELETE' }),
+    running: {
+      runs: ({ limit, offset } = {}) => request('/v1/admin/running/runs', { query: { limit, offset } }),
+      run: (runId) => request(`/v1/admin/running/runs/${id(runId)}`),
+      deleteRun: (runId) => request(`/v1/admin/running/runs/${id(runId)}`, { method: 'DELETE' }),
+      deleteRuns: (ids) => request('/v1/admin/running/runs/delete', { method: 'POST', body: { ids } }),
+      planDecisions: ({ limit, offset } = {}) => request('/v1/admin/running/plan-decisions', { query: { limit, offset } }),
+      briefs: ({ limit, offset } = {}) => request('/v1/admin/running/briefs', { query: { limit, offset } }),
+      deleteBrief: (sessionId) => request(`/v1/admin/running/briefs/${id(sessionId)}`, { method: 'DELETE' }),
+    },
+  };
+
+  // Olaf's server voice: identical WAV (24 kHz mono) on every device. Audio ids are content hashes.
+  const audioUrl = (idOrUrl) =>
+    /^https?:/.test(idOrUrl)
+      ? idOrUrl
+      : `${baseUrl.replace(/\/$/, '')}${String(idOrUrl).startsWith('/') ? idOrUrl : `/v1/voice/audio/${idOrUrl}.wav`}`;
+  const voice = {
+    /** -> {id, url, durationMs, cached}; waits for synthesis. 503 voice_unavailable if the server has no voice. */
+    speak: (text) => request('/v1/voice/speak', { method: 'POST', body: { text } }),
+    status: () => request('/v1/voice/status'),
+    /** Absolute URL for an audio id (or the `url` path from speak/cue/brief). Needs the Bearer header (or ?token=). */
+    audioUrl,
+    /** Download a clip with auth; resolves to an ArrayBuffer of WAV bytes. Waits server-side if still synthesising. */
+    fetchAudio: async (idOrUrl) => {
+      const token = getToken ? await getToken() : null;
+      let res;
+      try {
+        res = await doFetch(audioUrl(idOrUrl), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      } catch (err) {
+        throw new NetworkError(err);
+      }
+      if (!res.ok) throw errorFor(res.status, await parseBody(res));
+      return res.arrayBuffer();
+    },
+  };
+
   return {
     health: () => request('/v1/health', { auth: false }),
     pair: ({ code, deviceName }) => request('/v1/pair', { method: 'POST', body: { code, deviceName }, auth: false }),
     running,
+    admin,
+    voice,
   };
 }
 

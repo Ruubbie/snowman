@@ -47,11 +47,18 @@ echo "== .env (secrets copied from the uploaded file, never printed)"
   echo "TZ_NAME=Europe/Amsterdam"
   echo "DATABASE_URL=$DB_URL"
   grep -E '^(ANTHROPIC_API_KEY|ANTHROPIC_WORKSPACE_ID|OLAF_MODEL_FAST|OLAF_MODEL_SMART|AI_MONTHLY_BUDGET_USD)=' "$UPLOADED_ENV" || true
+  grep -E '^(VOICE_ENABLED|OLAF_VOICE|OLAF_VOICE_SPEED|VOICE_DTYPE|VOICE_THREADS|VOICE_CACHE_MAX_MB)=' "$UPLOADED_ENV" || true
   echo "PERSONA_FILE=$APP_DIR/data/persona.md"
+  # Olaf's voice (Kokoro-82M, runs inside the backbone). On first start the model
+  # (fp32 ~310 MB; VOICE_DTYPE=q8 ~90 MB but slower on Arm) downloads from Hugging Face
+  # into HF_CACHE_DIR in the background - boot is not blocked, /v1/voice/* answers
+  # 503 voice_unavailable until it is ready. Both dirs must be writable by `snowman`.
+  echo "HF_CACHE_DIR=$APP_DIR/data/hf-cache"
+  echo "VOICE_CACHE_DIR=$APP_DIR/data/voice-cache"
 } > "$ENV_FILE"
 chown snowman:snowman "$ENV_FILE"; chmod 600 "$ENV_FILE"
 shred -u "$UPLOADED_ENV" 2>/dev/null || rm -f "$UPLOADED_ENV"
-mkdir -p "$APP_DIR/data"; chown snowman:snowman "$APP_DIR/data"
+mkdir -p "$APP_DIR/data/hf-cache" "$APP_DIR/data/voice-cache"; chown -R snowman:snowman "$APP_DIR/data"
 echo "keys present: $(grep -c -E '^(ANTHROPIC_API_KEY|ANTHROPIC_WORKSPACE_ID)=.+' "$ENV_FILE") of 2"
 
 echo "== migrations"

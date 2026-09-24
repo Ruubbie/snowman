@@ -1,0 +1,53 @@
+/*
+ * Dark theme. The Olaf Design System only defines "snow-light", so dark is
+ * DERIVED here by inverting the Snow/Frost/Ink ramp (surfaces become ink,
+ * text becomes snow) and turning pale tints into translucent washes. Carrot
+ * stays the only warm colour. Everything else (components.css) keeps working
+ * because it reads these same custom properties.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --snow-0: #161c24;
+  --snow-50: #10151c;
+  --snow-100: #19202a;
+  --snow-200: #242d39;
+  --snow-300: #33404f;
+  --frost-400: #6f7c8c;
+  --frost-500: #97a4b3;
+  --ink-600: #c3ccd6;
+  --ink-700: #dce3ea;
+  --ink-800: #eef2f6;
+  --ink-900: #ffffff;
+
+  --carrot-50: rgba(255, 107, 26, 0.14);
+  --carrot-100: rgba(255, 107, 26, 0.3);
+  --carrot-700: #ff9a5c;
+  --ice-50: rgba(74, 163, 223, 0.1);
+  --ice-100: rgba(74, 163, 223, 0.18);
+  --ice-300: #3f7fae;
+  --ice-700: #8cc8f0;
+  --green-50: rgba(46, 158, 107, 0.16);
+  --amber-50: rgba(224, 153, 15, 0.16);
+  --red-50: rgba(217, 67, 58, 0.18);
+
+  --surface-scrim: rgba(16, 21, 28, 0.72);
+  --accent-on: #ffffff;
+  --text-ghost: #212a36;
+  --shadow-hair: 0 1px 0 rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+  --shadow-float: 0 18px 40px -16px rgba(0, 0, 0, 0.65);
+  --shadow-drift: 0 40px 80px -30px rgba(0, 0, 0, 0.75);
+}
+
+/* Things that must stay white on carrot, whatever the theme. */
+:root[data-theme='dark'] .ol-ibtn--solid,
+:root[data-theme='dark'] .ol-badge--solid,
+:root[data-theme='dark'] .ol-check input:checked + .ol-check__box {
+  color: #ffffff;
+}
+:root[data-theme='dark'] .ol-switch__track:after {
+  background: #ffffff;
+}
+:root[data-theme='dark'] .ol-badge--success { color: #6fd3a3; }
+:root[data-theme='dark'] .ol-badge--warning { color: #f2c060; }
+:root[data-theme='dark'] .ol-badge--danger { color: #f08a82; }

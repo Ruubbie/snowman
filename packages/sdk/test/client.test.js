@@ -158,3 +158,27 @@ test('running.settings PUTs to /v1/running/settings', async () => {
   await client.running.settings({ programStart: '2026-01-06' });
   assert.equal(seen.opts.method, 'PUT');
 });
+
+test('admin calls hit /v1/admin with auth; deletes send no JSON content-type', async () => {
+  const seen = [];
+  const client = createClient({
+    baseUrl: 'http://127.0.0.1:4000/',
+    getToken: () => 'tok',
+    fetchImpl: fakeFetch((url, opts) => {
+      seen.push({ url, opts });
+      return jsonResponse(200, { ok: true });
+    }),
+  });
+  await client.admin.running.runs({ limit: 10, offset: 20 });
+  await client.admin.running.deleteRun('a/b');
+  await client.admin.running.deleteRuns(['x', 'y']);
+  await client.admin.revokeDevice('dev-2');
+  assert.equal(seen[0].url, 'http://127.0.0.1:4000/v1/admin/running/runs?limit=10&offset=20');
+  assert.equal(seen[0].opts.headers.Authorization, 'Bearer tok');
+  assert.equal(seen[1].url, 'http://127.0.0.1:4000/v1/admin/running/runs/a%2Fb');
+  assert.equal(seen[1].opts.method, 'DELETE');
+  assert.equal(seen[1].opts.headers['Content-Type'], undefined);
+  assert.equal(seen[2].opts.method, 'POST');
+  assert.deepEqual(JSON.parse(seen[2].opts.body), { ids: ['x', 'y'] });
+  assert.equal(seen[3].url, 'http://127.0.0.1:4000/v1/admin/devices/dev-2');
+});

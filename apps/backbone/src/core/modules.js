@@ -3,7 +3,9 @@
  * @property {string} name
  * @property {string} [migrationsDir]
  * @property {import('../brain/tools.js').ToolDef[]} [tools] static Olaf tool defs (handlers receive ctx per-call, so no runtime ctx needed here)
- * @property {(app: import('fastify').FastifyInstance, ctx: object) => void} [register] does everything that needs runtime ctx: routes, event subscribers, job handlers, recurring jobs
+ * @property {(app: import('fastify').FastifyInstance, ctx: object) => void} [register] does everything that needs runtime ctx: routes, event subscribers, job handlers, recurring jobs.
+ *   Dashboard support: register admin routes under /v1/admin/<module>/* and one home-screen card via
+ *   ctx.admin.registerOverview('<module>', async () => stats).
  */
 
 /**

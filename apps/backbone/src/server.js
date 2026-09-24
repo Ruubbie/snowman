@@ -38,6 +38,15 @@ async function main() {
     app.log.error(err);
     process.exit(1);
   }
+
+  // Load Olaf's voice in the background (first start downloads the model); never blocks boot.
+  const { voice } = app.snowman;
+  if (voice.enabled) {
+    voice.warmUp().then(
+      () => app.log.info(voice.status(), 'voice engine warm'),
+      () => {}, // already logged by the engine; voice routes answer 503 voice_unavailable
+    );
+  }
 }
 
 main().catch((err) => {

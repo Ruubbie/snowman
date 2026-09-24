@@ -10,6 +10,10 @@ import { createBudget } from './brain/budget.js';
 import { createToolRegistry } from './brain/tools.js';
 import { registerOlafRoutes, createConversationRepo, sendOlafError } from './brain/routes.js';
 import { runAgent, structured, buildSystemBlocks } from './brain/agent.js';
+import { registerAdminRoutes } from './admin/routes.js';
+import { createAdminRegistry } from './admin/registry.js';
+import { createVoiceEngineFromConfig } from './voice/engine.js';
+import { registerVoiceRoutes } from './voice/routes.js';
 import runningModule from '@snowman/module-running';
 
 /**
@@ -28,10 +32,13 @@ import runningModule from '@snowman/module-running';
  *   deviceRepo?: object,
  *   conversationRepo?: object,
  *   runningRepo?: object,
+ *   adminRepo?: object,
+ *   runningAdminRepo?: object,
  *   persona?: string,
  *   clock?: () => Date,
  *   logger?: boolean|object,
  *   modules?: object[],
+ *   voice?: object,
  * }} opts
  * @returns {import('fastify').FastifyInstance}
  */
@@ -49,6 +56,8 @@ export function buildApp(opts) {
   const deviceRepo = opts.deviceRepo || createDeviceRepo(db);
   const conversationRepo = opts.conversationRepo || createConversationRepo(db);
   const persona = opts.persona ?? '';
+  // Olaf's server-side voice; off unless config.voiceEnabled === true, lazy-loads the model.
+  const voice = opts.voice || createVoiceEngineFromConfig(config, { logger: app.log });
 
   app.register(websocketPlugin);
 
@@ -117,18 +126,26 @@ export function buildApp(opts) {
     persona,
     conversationRepo,
     runningRepo: opts.runningRepo,
+    adminRepo: opts.adminRepo,
+    runningAdminRepo: opts.runningAdminRepo,
+    // Modules plug their dashboard card into GET /v1/admin/overview here.
+    admin: createAdminRegistry(),
     clock,
     // Shared with modules so they never need to import from apps/backbone directly.
     brainAgent: { runAgent, structured, buildSystemBlocks },
     sendOlafError,
+    // voice.enqueue(text) -> {id,url}|null, never blocks (see src/voice/engine.js).
+    voice,
   };
 
   registerOlafRoutes(app, ctx);
+  registerVoiceRoutes(app, { voice });
+  registerAdminRoutes(app, ctx);
 
   const modules = opts.modules || [runningModule];
   loadModules(app, ctx, modules);
 
-  app.decorate('snowman', { events, jobs, tools, brain, budget, deviceRepo, conversationRepo, config });
+  app.decorate('snowman', { events, jobs, tools, brain, budget, deviceRepo, conversationRepo, config, voice });
 
   return app;
 }
