@@ -1,0 +1,74 @@
+/* Olaf Design System tokens (mirrored from Claude Design project 43c4a5b6-8d4e-4caf-a345-d0b7df1fed3f: tokens/colors.css, typography.css, spacing.css, effects.css, fonts.css) */
+
+/* ---- fonts.css ---- */
+/* Mulish + DM Mono via Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Mulish:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+/* ---- colors.css ---- */
+:root{
+/* Snow — cool near-whites, the base of every surface */
+--snow-0:#FFFFFF;--snow-50:#F7F9FB;--snow-100:#EEF2F6;--snow-200:#E2E8EF;--snow-300:#CBD4DE;
+/* Frost → Ink — cool greys to deep blue-black text */
+--frost-400:#9AA7B6;--frost-500:#6B7888;--ink-600:#475261;--ink-700:#2C3542;--ink-800:#1B222C;--ink-900:#10151C;
+/* Carrot — the single warm accent (Olaf's nose) */
+--carrot-50:#FFF4EC;--carrot-100:#FFE3CF;--carrot-300:#FFA366;--carrot-500:#FF6B1A;--carrot-600:#E85A0C;--carrot-700:#B84406;
+/* Ice — secondary cool accent, data + info */
+--ice-50:#F1F8FD;--ice-100:#E1F0FA;--ice-300:#A9D3F2;--ice-500:#4AA3DF;--ice-700:#1F6FA8;
+/* Semantic */
+--green-500:#2E9E6B;--green-50:#EAF6F0;--amber-500:#E0990F;--amber-50:#FDF5E4;--red-500:#D9433A;--red-50:#FCEDEC;
+/* Semantic aliases */
+--surface-page:var(--snow-50);--surface-panel:var(--snow-100);--surface-card:var(--snow-0);--surface-sunken:var(--snow-200);
+--surface-inverse:var(--ink-800);--surface-scrim:rgba(247,249,251,.72);
+--text-strong:var(--ink-800);--text-body:var(--ink-600);--text-muted:var(--frost-500);--text-faint:var(--frost-400);
+--text-inverse:var(--snow-0);--text-ghost:var(--snow-200);
+--border-hair:var(--snow-200);--border-default:var(--snow-300);--border-strong:var(--ink-800);
+--accent:var(--carrot-500);--accent-hover:var(--carrot-600);--accent-press:var(--carrot-700);--accent-soft:var(--carrot-50);--accent-on:var(--snow-0);
+--info:var(--ice-500);--success:var(--green-500);--warning:var(--amber-500);--danger:var(--red-500);
+--focus-ring:0 0 0 3px var(--carrot-100);
+}
+
+/* ---- typography.css ---- */
+:root{
+--font-sans:'Mulish',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+--font-mono:'DM Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+--weight-light:300;--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;--weight-extrabold:800;--weight-black:900;
+--text-ghost-size:clamp(140px,18vw,260px);
+--text-display-xl:96px;--text-display:64px;--text-h1:44px;--text-h2:30px;--text-h3:20px;--text-h4:17px;
+--text-body-lg:17px;--text-body-size:15px;--text-small:13px;--text-caption:12px;--text-eyebrow:11px;
+--leading-tight:1.02;--leading-snug:1.2;--leading-body:1.7;
+--tracking-display:-0.025em;--tracking-heading:-0.01em;--tracking-eyebrow:0.2em;
+--type-display:var(--weight-extrabold) var(--text-display)/1.05 var(--font-sans);
+--type-h1:var(--weight-extrabold) var(--text-h1)/1.1 var(--font-sans);
+--type-h2:var(--weight-bold) var(--text-h2)/1.2 var(--font-sans);
+--type-h3:var(--weight-bold) var(--text-h3)/1.3 var(--font-sans);
+--type-body:var(--weight-regular) var(--text-body-size)/1.7 var(--font-sans);
+--type-small:var(--weight-regular) var(--text-small)/1.65 var(--font-sans);
+--type-eyebrow:var(--weight-bold) var(--text-eyebrow)/1 var(--font-sans);
+--type-data:var(--weight-medium) var(--text-small)/1 var(--font-mono);
+}
+
+/* ---- spacing.css ---- */
+:root{
+--space-0:0;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;--space-8:64px;--space-9:96px;--space-10:144px;
+--gutter:40px;--frame-pad:40px;--content-max:1200px;
+/* Radii — sharp by default; only intrinsically round things are round */
+--radius-0:0;--radius-xs:2px;--radius-sm:4px;--radius-full:999px;
+--radius-control:var(--radius-0);--radius-card:var(--radius-0);--radius-device:44px;
+--line-hair:1px;--line-bold:2px;--line-dash:6px;
+--control-sm:36px;--control-md:44px;--control-lg:56px;
+}
+
+/* ---- effects.css ---- */
+:root{
+--shadow-none:none;
+--shadow-hair:0 1px 0 rgba(27,34,44,.06);
+--shadow-soft:0 10px 30px -12px rgba(43,62,86,.14);
+--shadow-float:0 18px 40px -16px rgba(43,62,86,.22);
+--shadow-drift:0 40px 80px -30px rgba(43,62,86,.28);
+--blur-frost:saturate(1.4) blur(14px);
+--ease-out:cubic-bezier(.2,.7,.2,1);
+--ease-in-out:cubic-bezier(.6,0,.3,1);
+--ease-settle:cubic-bezier(.34,1.3,.5,1);
+--dur-fast:140ms;--dur-base:240ms;--dur-slow:480ms;--dur-drift:900ms;
+--opacity-disabled:.4;
+}

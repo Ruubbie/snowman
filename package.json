@@ -1,0 +1,22 @@
+{
+  "name": "snowman",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Snowman - personal AI backbone. Olaf is the AI character running on it.",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/modules/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @snowman/backbone",
+    "test": "node --test \"apps/**/*.test.js\" \"packages/**/*.test.js\"",
+    "migrate": "npm run migrate -w @snowman/backbone",
+    "pair": "npm run pair -w @snowman/backbone --",
+    "import:runcoach": "npm run import:runcoach -w @snowman/backbone --"
+  }
+}

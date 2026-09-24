@@ -1,0 +1,87 @@
+name: Polar iOS build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/polar/**'
+      - 'packages/**'
+      - '.github/workflows/polar-ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: polar-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Expo prebuild (generate ios/ project, incl. the Live Activity target)
+        working-directory: apps/polar
+        run: npx expo prebuild -p ios --no-install --clean
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/polar/ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('apps/polar/ios/Podfile') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Pod install
+        working-directory: apps/polar/ios
+        run: pod install --repo-update
+
+      - name: Build (unsigned; SideStore signs it on your phone)
+        working-directory: apps/polar/ios
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace Polar.xcworkspace \
+            -scheme Polar \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        working-directory: apps/polar/ios
+        run: |
+          set -euo pipefail
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Polar.app Payload/
+          zip -qry Polar.ipa Payload
+
+      - name: Publish "polar-latest" release
+        working-directory: apps/polar/ios
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete polar-latest -y --cleanup-tag || true
+          gh release create polar-latest Polar.ipa \
+            --repo "${{ github.repository }}" \
+            --title "Polar build ${{ github.run_number }}" \
+            --notes "Download Polar.ipa on your iPhone (in Safari) and install it with SideStore. See README > Polar on your iPhone."
