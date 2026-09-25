@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var conversationId: String?
     @State private var draft = ""
     @State private var thinking = false
+    @State private var seen: String? // latest conversation as last taken; a change means another device talked
 
     private let suggestions = ["How am I recovering?", "What should I train today?", "How did I sleep this week?"]
 
@@ -39,9 +40,17 @@ struct ChatView: View {
             }
             composer
         }
-        .task { await health.sync(session: session) }
+        .task {
+            await pickUp()
+            await health.sync(session: session)
+        }
         .onChange(of: scenePhase) {
-            if scenePhase == .active { Task { await health.sync(session: session) } }
+            if scenePhase == .active {
+                Task {
+                    await pickUp()
+                    await health.sync(session: session)
+                }
+            }
         }
     }
 
@@ -138,6 +147,16 @@ struct ChatView: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
         .background(Theme.surface)
+    }
+
+    /// Conversations are shared with the desktop: show the one last talked in on any device.
+    private func pickUp() async {
+        guard !thinking, let latest = try? await session.latestConversation() else { return }
+        let key = "\(latest.conversationId ?? ""):\(latest.messages.count)"
+        guard !thinking, key != seen else { return }
+        seen = key
+        conversationId = latest.conversationId
+        messages = latest.messages.map { ChatMessage(fromOlaf: $0.role == "olaf", text: $0.text) }
     }
 
     private func send() async {

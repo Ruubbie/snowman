@@ -5,7 +5,6 @@ import { useLoad } from '../lib/hooks.js';
 import { errorMessage } from '../lib/api.js';
 import { Badge, Button, Card, ErrorNote, IconButton, Loading, Page, Section, Tag } from '../components/ui.jsx';
 
-const CONVERSATION_KEY = 'olaf.desktop.conversationId';
 const SUGGESTIONS = ['How does my week look?', 'How did my last run go?', 'Can we move tomorrow to the day after?'];
 
 function greeting(d = new Date()) {
@@ -14,23 +13,6 @@ function greeting(d = new Date()) {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
-}
-
-function readConversationId() {
-  try {
-    return localStorage.getItem(CONVERSATION_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeConversationId(id) {
-  try {
-    if (id) localStorage.setItem(CONVERSATION_KEY, id);
-    else localStorage.removeItem(CONVERSATION_KEY);
-  } catch {
-    // private window: this chat just won't survive a reload
-  }
 }
 
 function chatError(err) {
@@ -113,32 +95,42 @@ export function Home() {
 
 function Chat() {
   const { client } = useApp();
-  const [conversationId, setConversationId] = useState(readConversationId);
+  const [conversationId, setConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(Boolean(conversationId));
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const scroller = useRef(null);
   const input = useRef(null);
 
+  // The chat is shared with the iPhone: show the conversation last talked in on any device,
+  // and pick it up again whenever this window comes back into focus.
+  const seen = useRef(null); // latest conversation as last taken; a change means another device talked
+  const busy = useRef(false);
   useEffect(() => {
-    if (!conversationId || messages.length) return;
     let alive = true;
-    client.olaf
-      .conversation(conversationId)
-      .then((res) => alive && setMessages(res.messages))
-      .catch(() => {
-        // gone (deleted under Conversations): start fresh
-        if (!alive) return;
-        writeConversationId(null);
-        setConversationId(null);
-      })
-      .finally(() => alive && setLoadingHistory(false));
+    async function pickUp() {
+      if (busy.current) return;
+      try {
+        const res = await client.olaf.latestConversation();
+        const key = `${res.conversationId}:${res.messages.length}`;
+        if (!alive || busy.current || key === seen.current) return;
+        seen.current = key;
+        setConversationId(res.conversationId);
+        setMessages(res.messages);
+      } catch {
+        // offline: keep what is on screen
+      } finally {
+        if (alive) setLoadingHistory(false);
+      }
+    }
+    pickUp();
+    window.addEventListener('focus', pickUp);
     return () => {
       alive = false;
+      window.removeEventListener('focus', pickUp);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
   function scrollToEnd() {
@@ -154,14 +146,12 @@ function Chat() {
     setDraft('');
     setError(null);
     setSending(true);
+    busy.current = true;
     // Sending cuts short a reply still being typed out.
     setMessages((m) => [...m.map((x) => (x.typing ? { ...x, typing: false } : x)), { role: 'user', text: message }]);
     try {
       const res = await client.olaf.chat({ message, conversationId });
-      if (res.conversationId !== conversationId) {
-        setConversationId(res.conversationId);
-        writeConversationId(res.conversationId);
-      }
+      setConversationId(res.conversationId);
       setMessages((m) => [...m, { role: 'olaf', text: res.reply || '…', typing: true }]);
     } catch (err) {
       setMessages((m) => m.slice(0, -1));
@@ -169,12 +159,12 @@ function Chat() {
       setError(chatError(err));
     } finally {
       setSending(false);
+      busy.current = false;
       input.current?.focus();
     }
   }
 
   function newChat() {
-    writeConversationId(null);
     setConversationId(null);
     setMessages([]);
     setError(null);

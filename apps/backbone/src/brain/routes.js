@@ -21,6 +21,11 @@ export function createConversationRepo(pool) {
         [id, deviceId],
       );
     },
+    /** The conversation talked in most recently, from any device: the one every device shows. */
+    async latestId() {
+      const [rows] = await pool.query('SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1');
+      return rows[0]?.id ?? null;
+    },
     async loadMessages(id) {
       const [rows] = await pool.query(
         'SELECT role, content FROM conversation_messages WHERE conversation_id = ? ORDER BY id',
@@ -94,7 +99,7 @@ function sendOlafError(reply, err) {
 }
 
 /**
- * Register core Olaf routes: POST /v1/olaf/chat, GET /v1/olaf/conversations/:id, GET /v1/olaf/usage.
+ * Register core Olaf routes: POST /v1/olaf/chat, GET /v1/olaf/conversations/latest and /:id, GET /v1/olaf/usage.
  * @param {import('fastify').FastifyInstance} app
  * @param {{brain: object, budget: object, tools: object, events: object, persona: string, config: object, conversationRepo: ReturnType<typeof createConversationRepo>, clock?: () => Date}} ctx
  */
@@ -148,6 +153,13 @@ export function registerOlafRoutes(app, ctx) {
       }
     },
   );
+
+  // Conversations are shared: the iPhone and the desktop both pick up the latest one.
+  app.get('/v1/olaf/conversations/latest', async () => {
+    const conversationId = await conversationRepo.latestId();
+    const messages = conversationId ? await conversationRepo.loadTranscript(conversationId) : [];
+    return { conversationId, messages };
+  });
 
   app.get('/v1/olaf/conversations/:id', async (request, reply) => {
     const messages = await conversationRepo.loadTranscript(request.params.id);

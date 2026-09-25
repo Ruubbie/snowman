@@ -128,6 +128,8 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
     chat: ({ message, conversationId }) => request('/v1/olaf/chat', { method: 'POST', body: { message, conversationId: conversationId ?? null } }),
     /** -> {conversationId, messages: [{role: 'user'|'olaf', text, at}]} */
     conversation: (conversationId) => request(`/v1/olaf/conversations/${id(conversationId)}`),
+    /** The conversation last talked in from any device -> {conversationId|null, messages} */
+    latestConversation: () => request('/v1/olaf/conversations/latest'),
   };
 
   return {

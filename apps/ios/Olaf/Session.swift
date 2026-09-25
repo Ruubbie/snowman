@@ -42,6 +42,12 @@ final class Session {
         return try await OlafAPI.send(base: serverURL, path: "/v1/olaf/chat", token: token, body: body)
     }
 
+    /// The conversation last talked in from any device (the desktop shares it).
+    func latestConversation() async throws -> Transcript {
+        guard let serverURL, let token else { throw OlafError.notPaired }
+        return try await OlafAPI.send(base: serverURL, path: "/v1/olaf/conversations/latest", token: token, body: nil)
+    }
+
     /// Apple Health rows built by HealthSync.
     func importHealth(samples: [[String: Any]], workouts: [[String: Any]]) async throws -> ImportResponse {
         guard let serverURL, let token else { throw OlafError.notPaired }
@@ -59,6 +65,11 @@ final class Session {
 struct PairResponse: Decodable { let token: String }
 struct ImportResponse: Decodable { let samples: Int; let workouts: Int }
 struct ChatResponse: Decodable { let conversationId: String; let reply: String }
+struct Transcript: Decodable {
+    let conversationId: String?
+    let messages: [Line]
+    struct Line: Decodable { let role: String; let text: String }
+}
 
 enum OlafError: LocalizedError {
     case badURL
