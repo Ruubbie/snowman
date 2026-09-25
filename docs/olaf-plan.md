@@ -12,7 +12,7 @@ We follow KISS and YAGNI: we build only what the next step needs.
 | iPhone | `apps/polar` (Expo/React Native) with its own GPS tracker, live cues, Live Activity | Native SwiftUI **Olaf app**: HealthKit in, WorkoutKit out, App Intents for Siri |
 | Workouts | Polar tracks the run itself | Apple Workout app on the Watch tracks it, and HealthKit sends the result to Olaf |
 | Smart home | nothing | nothing until there are devices (see "Not now") |
-| Dashboard | `apps/desktop` (React + Electron shell) | The same React UI, running in a browser |
+| Dashboard | `apps/desktop` (React + Electron) | The Olaf home app on the desktop: all data, trends, soft UI like the iPhone app |
 
 ## Keep
 
@@ -34,7 +34,6 @@ We follow KISS and YAGNI: we build only what the next step needs.
 - **`packages/ui`**: it's a React Native port of the design system and only Polar uses it.
 - **`.github/workflows/polar-ios.yml`**: it gets replaced by a workflow for the Olaf app.
 - **Live-cue code:** the `/v1/running/cue` route and `backbone/scripts/fake-run.js`. Olaf's voice can't run inside Apple's Workout app. (`shared/src/runningTelemetry.js` stays: the run upload uses it, and HealthKit workouts will come in the same way.)
-- **`apps/desktop/electron/`**: it was never launched. Run `npm run dev` and open the page in a browser instead.
 - **RunCoach (Downloads)**: delete it once its pipeline has been copied. `import-runcoach.js` and `running/src/import.js` can go once the old runs have been imported.
 
 ## Not now (YAGNI). Build these when there's a concrete need
