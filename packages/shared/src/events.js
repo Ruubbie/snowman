@@ -6,6 +6,7 @@ export const EVENTS = {
   RUNNING_PLAN_CHANGED: 'running.plan.changed',
   RUNNING_RUN_COMPLETED: 'running.run.completed',
   RUNNING_DEBRIEF_READY: 'running.debrief.ready',
+  HEALTH_IMPORTED: 'health.imported',
   OLAF_CONFIRMATION_REQUESTED: 'olaf.confirmation.requested',
 };
 

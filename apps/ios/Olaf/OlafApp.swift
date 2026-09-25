@@ -3,10 +3,12 @@ import SwiftUI
 @main
 struct OlafApp: App {
     @State private var session = Session()
+    @State private var health = HealthSync()
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
+                Theme.surface.ignoresSafeArea()
                 if session.isPaired {
                     ChatView()
                 } else {
@@ -14,12 +16,9 @@ struct OlafApp: App {
                 }
             }
             .environment(session)
+            .environment(health)
             .tint(.carrot)
+            .preferredColorScheme(.light)
         }
     }
-}
-
-extension Color {
-    /// The only warm colour in the Olaf design system (design/olaf-ds/tokens.css).
-    static let carrot = Color(red: 1, green: 0x6B / 255, blue: 0x1A / 255)
 }

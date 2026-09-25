@@ -16,4 +16,5 @@ apps/desktop/dist/
 # iOS app: XcodeGen output and build products
 apps/ios/Olaf.xcodeproj/
 apps/ios/Olaf/Info.plist
+apps/ios/Olaf/Olaf.entitlements
 apps/ios/build/

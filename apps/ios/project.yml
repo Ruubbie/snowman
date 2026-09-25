@@ -12,7 +12,7 @@ targets:
     info:
       path: Olaf/Info.plist
       properties:
-        CFBundleDisplayName: "olaf"
+        CFBundleDisplayName: "Olaf"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
@@ -20,13 +20,21 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSLocalNetworkUsageDescription: "Olaf talks to your own Snowman server on your home network."
+        NSHealthShareUsageDescription: "Olaf reads your workouts, sleep, heart rate and HRV so he can coach you and spot patterns. The data goes only to your own Snowman server."
+        NSHealthUpdateUsageDescription: "Olaf saves planned workouts to Apple Health."
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+    entitlements:
+      path: Olaf/Olaf.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.ruben.olaf
-        MARKETING_VERSION: "0.1"
+        MARKETING_VERSION: "0.2"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

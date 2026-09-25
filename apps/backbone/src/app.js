@@ -15,6 +15,7 @@ import { createAdminRegistry } from './admin/registry.js';
 import { createVoiceEngineFromConfig } from './voice/engine.js';
 import { registerVoiceRoutes } from './voice/routes.js';
 import runningModule from '@snowman/module-running';
+import healthModule from '@snowman/module-health';
 
 /**
  * Build a (not-yet-listening) Fastify instance wired up with the full
@@ -144,7 +145,7 @@ export function buildApp(opts) {
   registerVoiceRoutes(app, { voice });
   registerAdminRoutes(app, ctx);
 
-  const modules = opts.modules || [runningModule];
+  const modules = opts.modules || [runningModule, healthModule];
   loadModules(app, ctx, modules);
 
   app.decorate('snowman', { events, jobs, tools, brain, budget, deviceRepo, conversationRepo, config, voice });

@@ -6,6 +6,7 @@ import { migrationSourcesFor } from './core/modules.js';
 import { loadPersona } from './brain/persona.js';
 import { buildApp } from './app.js';
 import runningModule from '@snowman/module-running';
+import healthModule from '@snowman/module-health';
 
 async function main() {
   const config = loadConfig();
@@ -22,7 +23,7 @@ async function main() {
     process.exit(1);
   }
 
-  const modules = [runningModule];
+  const modules = [runningModule, healthModule];
   const backboneMigrationsDir = fileURLToPath(new URL('../migrations', import.meta.url));
   await runMigrations(db, migrationSourcesFor([{ name: 'backbone', migrationsDir: backboneMigrationsDir }, ...modules]));
 

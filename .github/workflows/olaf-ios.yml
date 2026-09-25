@@ -41,6 +41,8 @@ jobs:
         run: |
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/Olaf.app Payload/
+          # Unsigned builds carry no entitlements; embed them ad hoc so SideStore keeps HealthKit.
+          codesign --force --sign - --entitlements Olaf/Olaf.entitlements Payload/Olaf.app
           zip -qry Olaf.ipa Payload
 
       - name: Publish as "olaf-latest" release

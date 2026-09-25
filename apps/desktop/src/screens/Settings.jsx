@@ -7,7 +7,7 @@ import { useOverlay } from '../components/overlay.jsx';
 const STORAGE_TEXT = {
   encrypted: 'Encrypted on this computer with the operating system keychain (Electron safeStorage).',
   memory: 'Kept in memory only (encryption is unavailable here), so you will need to pair again after a restart.',
-  'browser-dev': 'Stored unencrypted in this browser.',
+  'browser-dev': 'Browser dev mode: stored unencrypted in this browser. Use the Electron app for real use.',
   none: 'No token stored.',
 };
 
@@ -69,7 +69,7 @@ export function Settings() {
           <dt>App</dt>
           <dd>olaf desktop {state.appVersion}</dd>
           <dt>Shell</dt>
-          <dd>Browser</dd>
+          <dd>{state.shell === 'desktop' ? 'Electron' : 'Browser (dev)'}</dd>
         </dl>
       </Section>
     </Page>
