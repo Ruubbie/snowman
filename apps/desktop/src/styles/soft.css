@@ -1,0 +1,164 @@
+/*
+ * Soft UI, the same style as the Olaf iPhone app: one surface colour,
+ * raised elements with a dark and a light shadow, pressed-in fields, pill
+ * buttons, carrot orange as the only accent. Loaded last, so it only
+ * overrides tokens and a few component classes.
+ */
+:root {
+  --soft-bg: #efefef;
+  --soft-raise: 8px 8px 18px rgba(160, 160, 168, 0.42), -8px -8px 18px rgba(255, 255, 255, 0.95);
+  --soft-raise-sm: 4px 4px 10px rgba(160, 160, 168, 0.38), -4px -4px 10px rgba(255, 255, 255, 0.95);
+  --soft-inset: inset 3px 3px 7px rgba(160, 160, 168, 0.35), inset -3px -3px 7px rgba(255, 255, 255, 0.9);
+  --soft-radius: 24px;
+}
+:root:not([data-theme='dark']) {
+  --surface-page: var(--soft-bg);
+  --surface-card: var(--soft-bg);
+  --surface-panel: #e9e9e9;
+  --border-hair: rgba(0, 0, 0, 0.05);
+}
+:root[data-theme='dark'] {
+  --soft-bg: var(--snow-50);
+  --soft-raise: 8px 8px 18px rgba(0, 0, 0, 0.5), -6px -6px 16px rgba(255, 255, 255, 0.035);
+  --soft-raise-sm: 4px 4px 10px rgba(0, 0, 0, 0.45), -3px -3px 8px rgba(255, 255, 255, 0.03);
+  --soft-inset: inset 3px 3px 7px rgba(0, 0, 0, 0.45), inset -3px -3px 7px rgba(255, 255, 255, 0.03);
+  --surface-card: var(--soft-bg);
+}
+
+body {
+  background: var(--soft-bg);
+}
+
+/* Sidebar: same surface, pill nav, the active item raised. */
+.sidebar {
+  background: var(--soft-bg);
+  border-right: 0;
+}
+.sidebar__foot {
+  border-top: 0;
+}
+.nav-item {
+  border-radius: 999px;
+  padding-left: 18px;
+  transition: color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.nav-item--sub {
+  padding-left: 40px;
+}
+.nav-item::before {
+  display: none;
+}
+.nav-item--active {
+  background: var(--soft-bg);
+  box-shadow: var(--soft-raise-sm);
+}
+.nav-item--active svg {
+  color: var(--accent);
+}
+
+/* Cards and panels float. */
+.ol-card,
+.table-wrap,
+.ol-dialog,
+.ol-toast {
+  border-radius: var(--soft-radius);
+}
+.ol-card--white,
+.ol-card--tint,
+.table-wrap {
+  background: var(--soft-bg);
+  box-shadow: var(--soft-raise);
+  border: 0;
+}
+.table-wrap {
+  overflow: hidden;
+}
+.ol-card--outline {
+  border: 0;
+  box-shadow: var(--soft-inset);
+}
+.ol-card--interactive:hover {
+  box-shadow: var(--soft-raise);
+  transform: translateY(-3px);
+}
+.page__panel {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Buttons: raised pills, ink text; the accent lives in icons and hover. */
+.ol-btn {
+  border-radius: 999px;
+}
+.ol-btn--primary,
+.ol-btn--secondary,
+.ol-btn--outline {
+  background: var(--soft-bg);
+  color: var(--text-strong);
+  border-color: transparent;
+  box-shadow: var(--soft-raise-sm);
+}
+.ol-btn--primary svg {
+  color: var(--accent);
+}
+.ol-btn--primary:hover:not([disabled]),
+.ol-btn--secondary:hover:not([disabled]),
+.ol-btn--outline:hover:not([disabled]) {
+  background: var(--soft-bg);
+  color: var(--accent);
+}
+.ol-btn:active:not([disabled]) {
+  box-shadow: var(--soft-inset);
+}
+.ol-ibtn {
+  border-radius: 50%;
+}
+.ol-ibtn--solid,
+.ol-ibtn--outline,
+.ol-ibtn--dark {
+  background: var(--soft-bg);
+  color: var(--text-strong);
+  border-color: transparent;
+  box-shadow: var(--soft-raise-sm);
+}
+
+/* Fields are pressed into the surface. */
+.ol-inputwrap,
+.ol-select {
+  border-radius: 16px;
+  border-color: transparent;
+  background: var(--soft-bg);
+  box-shadow: var(--soft-inset);
+}
+
+/* Tabs, badges and tags: pills. */
+.ol-tabs--pill {
+  border-radius: 999px;
+  background: var(--soft-bg);
+  box-shadow: var(--soft-inset);
+  padding: 4px;
+}
+.ol-tabs--pill .ol-tab {
+  border-radius: 999px;
+}
+.ol-tabs--pill .ol-tab--active {
+  background: var(--soft-bg);
+  color: var(--text-strong);
+  box-shadow: var(--soft-raise-sm);
+}
+.ol-badge,
+.ol-tag {
+  border-radius: 999px;
+}
+
+/* Chat */
+.bubble--assistant {
+  background: var(--soft-bg);
+  box-shadow: var(--soft-raise-sm);
+  border-radius: 20px;
+}
+.bubble--user {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 20px;
+}

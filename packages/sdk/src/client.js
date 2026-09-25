@@ -134,6 +134,10 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
     health: () => request('/v1/health', { auth: false }),
     pair: ({ code, deviceName }) => request('/v1/pair', { method: 'POST', body: { code, deviceName }, auth: false }),
     running,
+    /** Apple Health data: GET /v1/health/summary -> {days: [...], workouts: [...]} */
+    healthData: {
+      summary: ({ days } = {}) => request('/v1/health/summary', { query: { days } }),
+    },
     olaf,
     admin,
     voice,

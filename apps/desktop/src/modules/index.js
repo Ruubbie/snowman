@@ -5,8 +5,9 @@
 // - OverviewCard receives GET /v1/admin/overview -> modules[<id>] (the backend
 //   side registers it with ctx.admin.registerOverview('<id>', ...)).
 import { running } from './running/index.js';
+import { health } from './health/index.js';
 
-export const modules = [running];
+export const modules = [health, running];
 
 export function findModule(id) {
   return modules.find((m) => m.id === id) || null;
