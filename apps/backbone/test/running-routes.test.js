@@ -79,7 +79,7 @@ function buildTestApp({ brain, runningRepo }) {
     persona: 'Olaf test persona',
     deviceRepo: fakeDeviceRepo(),
     runningRepo,
-    events: { async publish() {} },
+    events: { async publish() {}, subscribe() {} },
   });
 }
 
@@ -274,7 +274,7 @@ test('GET /v1/running/upcoming lists the next days with any stored brief', async
   const brain = { available: false, async createMessage() { throw new Error('no AI calls here'); } };
   const app = buildApp({
     config: BASE_CONFIG, db: null, brain, budget: fakeBudget(), deviceRepo: fakeDeviceRepo(), runningRepo,
-    events: { async publish() {} }, clock: () => new Date('2026-02-02T08:00:00Z'),
+    events: { async publish() {}, subscribe() {} }, clock: () => new Date('2026-02-02T08:00:00Z'),
   });
   const res = await app.inject({ method: 'GET', url: '/v1/running/upcoming?days=4', headers: { authorization: `Bearer ${TEST_TOKEN}` } });
   assert.equal(res.statusCode, 200);

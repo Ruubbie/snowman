@@ -142,6 +142,7 @@ function buildTestApp() {
     adminRepo: fakeCoreAdminRepo(),
     runningAdminRepo,
     events: {
+      subscribe() {},
       async publish(type, payload) {
         published.push({ type, payload });
       },

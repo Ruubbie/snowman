@@ -48,6 +48,12 @@ final class Session {
         let body: [String: Any] = ["samples": samples, "workouts": workouts]
         return try await OlafAPI.send(base: serverURL, path: "/v1/health/import", token: token, body: body)
     }
+
+    /// The next few planned sessions, each with its brief.
+    func upcoming() async throws -> Upcoming {
+        guard let serverURL, let token else { throw OlafError.notPaired }
+        return try await OlafAPI.send(base: serverURL, path: "/v1/running/upcoming", token: token, body: nil)
+    }
 }
 
 struct PairResponse: Decodable { let token: String }

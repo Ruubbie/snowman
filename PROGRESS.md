@@ -11,7 +11,7 @@ Direction, keep/throw-away list and the reasoning: [docs/olaf-plan.md](docs/olaf
 
 ## Next (in order)
 - [x] **Step 2 - Olaf iOS app skeleton:** SwiftUI + XcodeGen + GitHub Actions, installed with Impactor (SideStore/Sideloadly strip HealthKit); pairing, token in Keychain, chat with Olaf. Runs on the phone with HealthKit working
-- [~] **Step 3 - HealthKit to Olaf:** health module (`/v1/health/import`, `/v1/health/summary`, tool `health_get_summary`) deployed; iOS sync on app open (resting HR, HRV, VO2max, weight, sleep stages, workouts). Still to do: test on the phone; background delivery; workout HR/route series
-- [ ] **Step 4 - Olaf to WorkoutKit:** planner emits workout JSON, the app schedules a `CustomWorkout` on the Watch; the brief becomes a short pre-run message
+- [~] **Step 3 - HealthKit to Olaf:** health module (`/v1/health/import`, `/v1/health/summary`, tool `health_get_summary`) deployed; iOS sync on app open (resting HR, HRV, VO2max, weight, sleep stages, workouts). Tested on the phone. Still to do: background delivery; workout HR/route series
+- [~] **Step 4 - Olaf to your run (no Watch):** the app shows today's session and Olaf's opening line; record it with the iPhone Fitness app; a running workout from Apple Health (last 3 days) becomes a run, completes that day's session and gets a debrief. WorkoutKit `CustomWorkout` scheduling only reaches an Apple Watch, so that waits for one
 - [ ] **Step 5 - App Intents:** "What should I train today?", "How am I recovering?"
 - [ ] **Step 6 - Home:** only once there are real devices

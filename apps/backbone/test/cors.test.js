@@ -18,7 +18,7 @@ function buildTestApp(overrides = {}) {
   return buildApp({
     config: { ...BASE_CONFIG, ...overrides },
     deviceRepo: fakeDeviceRepo(),
-    events: { publish: async () => {} },
+    events: { publish: async () => {}, subscribe() {} },
     jobs: { enqueue: async () => {}, registerHandler() {}, registerRecurring() {} },
     brain: { available: false },
     budget: { assertWithinBudget: async () => {}, logUsage: async () => 0, monthTotalUsd: async () => 0 },

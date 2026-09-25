@@ -282,7 +282,7 @@ function testApp({ voice, brain = { available: false }, runningRepo = {} }) {
         return hash === sha256Hex(TOKEN) ? { id: 'device-1', name: 'Test' } : null;
       },
     },
-    events: { async publish() {} },
+    events: { async publish() {}, subscribe() {} },
     jobs: { async enqueue() {}, registerHandler() {}, registerRecurring() {} },
     runningRepo,
     voice,

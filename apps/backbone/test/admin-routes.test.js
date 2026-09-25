@@ -114,6 +114,7 @@ function buildTestApp({ modules = [] } = {}) {
     adminRepo,
     modules,
     events: {
+      subscribe() {},
       async publish(type, payload) {
         published.push({ type, payload });
       },

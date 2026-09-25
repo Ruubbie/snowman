@@ -5,6 +5,7 @@ import { materialize } from './planner.js';
 import { parseImportInput } from './import.js';
 import { applyImport } from './importRunner.js';
 import { analyzeRun } from './analysis.js';
+import { importHealthRuns } from './healthRuns.js';
 
 const BODY_LIMIT_20MB = 20 * 1024 * 1024;
 
@@ -32,8 +33,8 @@ ${SPOKEN_STYLE}
 
 Return only the requested JSON.`;
 const STABLE_DEBRIEF_INSTRUCTIONS =
-  'You are Olaf, giving a short honest debrief right after a run, to a beginner runner on an iPhone with no ' +
-  'heart-rate data. Use the running tools if you need more plan context.';
+  'You are Olaf, giving a short honest debrief right after a run, to a beginner runner. Heart rate is only ' +
+  "known when the run's device field has it. Use the running tools if you need more plan context.";
 const STABLE_REMINDER_INSTRUCTIONS =
   'You are Olaf, writing a very short local-notification reminder in character for a beginner runner. One or ' +
   'two sentences, plain and encouraging.';
@@ -736,6 +737,16 @@ export function registerJobs(ctx, shared = createRunningShared(ctx)) {
       { model: ctx.config.olafModelSmart, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 1500 },
     );
     await ctx.events.publish(EVENTS.RUNNING_DEBRIEF_READY, { runId: run.id, text: result.text });
+  });
+
+  // A run recorded in Apple Health (the Fitness app) closes the loop like an uploaded run.
+  ctx.events.subscribe(EVENTS.HEALTH_IMPORTED, async ({ payload }) => {
+    const runIds = await importHealthRuns(repo, payload.workouts || [], { now: clock(), tzName });
+    for (const runId of runIds) {
+      await ctx.events.publish(EVENTS.RUNNING_RUN_COMPLETED, { runId });
+      await ctx.jobs.enqueue('running.debrief', { runId });
+    }
+    if (runIds.length) shared.nudgePrepare();
   });
 
   ctx.jobs.registerRecurring({ type: 'running.materialize', everyDayAt: '03:00' });

@@ -92,7 +92,8 @@ const healthModule = {
         if (samples.length) await repo.upsertSamples(samples);
         if (workouts.length) await repo.upsertWorkouts(workouts);
         if (samples.length || workouts.length) {
-          await ctx.events.publish(EVENTS.HEALTH_IMPORTED, { samples: samples.length, workouts: workouts.length });
+          // The workouts themselves ride along so the running module can match runs to the plan.
+          await ctx.events.publish(EVENTS.HEALTH_IMPORTED, { samples: samples.length, workouts });
         }
         return { samples: samples.length, workouts: workouts.length };
       },

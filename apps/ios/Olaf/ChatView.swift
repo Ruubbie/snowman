@@ -82,10 +82,11 @@ struct ChatView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 20) {
+            TodayCard().padding(.top, 16)
             Text("What's on\nyour mind?")
                 .font(.system(size: 36, weight: .bold))
                 .foregroundStyle(Theme.ink)
-                .padding(.top, 40)
+                .padding(.top, 20)
             ForEach(suggestions, id: \.self) { text in
                 Button {
                     draft = text
