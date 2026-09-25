@@ -20,7 +20,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSLocalNetworkUsageDescription: "Olaf talks to your own Snowman server on your home network."
-        NSHealthShareUsageDescription: "Olaf reads your workouts, sleep, heart rate and HRV so he can coach you and spot patterns. The data goes only to your own Snowman server."
+        NSHealthShareUsageDescription: "Olaf reads your workouts, sleep, activity, vitals, body measurements and mood so he can coach you and spot patterns. The data goes only to your own Snowman server."
         NSHealthUpdateUsageDescription: "Olaf saves planned workouts to Apple Health."
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

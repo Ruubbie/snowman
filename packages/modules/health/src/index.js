@@ -49,8 +49,13 @@ const healthTools = [
   {
     name: 'health_get_summary',
     description:
-      "Get the user's Apple Health data per day (sleep minutes, resting heart rate, HRV, VO2max, body mass) " +
-      'and their workouts for the last N days, newest first. Use it for questions about recovery, sleep or training.',
+      "Get the user's Apple Health data per day and their workouts for the last N days, newest first. A day has a " +
+      'field per type with data: sleep_min, resting_hr, hrv_ms, vo2max, body_mass_kg, body_fat_pct, walking_hr, ' +
+      'heart_rate_avg/min/max, respiratory_rate, spo2_pct, wrist_temp, bp_systolic/diastolic, glucose (mg/dL), ' +
+      'steps, walk_run_m, cycling_m, flights, active_kcal, basal_kcal, exercise_min, stand_min, daylight_min, ' +
+      'water_ml, caffeine_mg, food_kcal, protein_g, headphone_db, noise_db, walking_speed (m/s), step_length (cm), ' +
+      'mindful_min, mood_day/mood_moment (valence -1 very unpleasant to 1 very pleasant), and more. ' +
+      'Use it for questions about recovery, sleep, activity, training or how the user is doing.',
     risk: 'read',
     input_schema: {
       type: 'object',

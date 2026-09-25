@@ -11,8 +11,16 @@ export const METRICS = [
   { id: 'sleep_min', label: 'Sleep', unit: 'h', fmt: (v) => fmtNum(v / 60, 1), lowerIsBetter: false },
   { id: 'hrv_ms', label: 'HRV', unit: 'ms', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
   { id: 'resting_hr', label: 'Resting heart rate', unit: 'bpm', fmt: (v) => fmtNum(v, 0), lowerIsBetter: true },
+  { id: 'steps', label: 'Steps', unit: '', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
+  { id: 'active_kcal', label: 'Active energy', unit: 'kcal', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
+  { id: 'exercise_min', label: 'Exercise', unit: 'min', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
+  { id: 'walking_hr', label: 'Walking heart rate', unit: 'bpm', fmt: (v) => fmtNum(v, 0), lowerIsBetter: true },
+  { id: 'respiratory_rate', label: 'Breathing rate', unit: '/min', fmt: (v) => fmtNum(v, 1), lowerIsBetter: true },
+  { id: 'spo2_pct', label: 'Blood oxygen', unit: '%', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
+  { id: 'daylight_min', label: 'Time in daylight', unit: 'min', fmt: (v) => fmtNum(v, 0), lowerIsBetter: false },
   { id: 'vo2max', label: 'VO2 max', unit: 'ml/kg·min', fmt: (v) => fmtNum(v, 1), lowerIsBetter: false },
   { id: 'body_mass_kg', label: 'Weight', unit: 'kg', fmt: (v) => fmtNum(v, 1), lowerIsBetter: true },
+  { id: 'body_fat_pct', label: 'Body fat', unit: '%', fmt: (v) => fmtNum(v, 1), lowerIsBetter: true },
 ];
 
 const RANGES = [
