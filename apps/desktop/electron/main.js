@@ -55,6 +55,7 @@ function createDashboardWindow() {
     minWidth: 560,
     minHeight: 520,
     title: 'Olaf',
+    icon: path.join(__dirname, 'icon.png'),
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#10151C' : '#F7F9FB',
     autoHideMenuBar: true,

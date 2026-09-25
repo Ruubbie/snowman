@@ -401,9 +401,16 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
   private func handle(_ locations: [CLLocation]) {
     for loc in locations {
       gpsAccuracyM = loc.horizontalAccuracy
-      onEvent?("gps", ["accuracy_m": gpsAccuracyM])
+      var gpsEvent: [String: Any] = [
+        "accuracy_m": gpsAccuracyM,
+        "lat": loc.coordinate.latitude, "lon": loc.coordinate.longitude,
+        "on_route": false,
+      ]
 
-      guard phase == .running || phase == .paused else { continue }
+      guard phase == .running || phase == .paused else {
+        onEvent?("gps", gpsEvent)
+        continue
+      }
       refreshElapsed()
 
       var accepted = phase == .running
@@ -434,6 +441,9 @@ final class RunSessionController: NSObject, CLLocationManagerDelegate {
         checkKmSplit()
       }
 
+      // The run screen's map draws the accepted fixes as the route so far.
+      gpsEvent["on_route"] = accepted
+      onEvent?("gps", gpsEvent)
       recordSample(loc, accepted: accepted)
     }
   }

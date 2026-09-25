@@ -189,7 +189,7 @@ function Gallery() {
 
         <Section title="GhostWord + SplitFrame">
           <View style={{ height: 140, position: 'relative', overflow: 'hidden' }}>
-            <SplitFrame panelWidth="50%" panelHeight={140}>
+            <SplitFrame panelWidth="50%" panelHeight={140} bleedTop={false}>
               <GhostWord size={90} style={{ position: 'absolute', top: 10, right: -10 }}>Run</GhostWord>
               <Text style={{ padding: 20 }} variant="h3">Split frame</Text>
             </SplitFrame>

@@ -7,6 +7,7 @@ export default {
   scheme: 'polar',
   version: '0.1.0',
   orientation: 'portrait',
+  icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   ios: {

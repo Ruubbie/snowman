@@ -239,6 +239,7 @@ function tick() {
     accepted,
   };
   runState.samples.push(sample);
+  emit('gps', { accuracy_m: accuracyM, lat: sample.lat, lon: sample.lon, on_route: accepted });
 
   const target = runState.brief?.targets?.[segIndex];
   const snapshot = {

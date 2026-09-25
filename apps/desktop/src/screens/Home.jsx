@@ -41,6 +41,64 @@ function chatError(err) {
   return errorMessage(err);
 }
 
+/** How long a reply takes to type out: quick for a line, never more than a few seconds for a long one. */
+const TYPE_TICK_MS = 24;
+const TYPE_MAX_MS = 3200;
+
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/** Olaf's newest reply appears as if he's typing it; older ones are shown whole. */
+function TypedText({ text, active, onGrow, onDone }) {
+  const [shown, setShown] = useState(active ? 0 : text.length);
+
+  useEffect(() => {
+    if (!active || prefersReducedMotion()) {
+      setShown(text.length);
+      if (active) onDone?.();
+      return undefined;
+    }
+    const step = Math.max(1, Math.ceil(text.length / (TYPE_MAX_MS / TYPE_TICK_MS)));
+    let n = 0;
+    let hold = 0;
+    const t = setInterval(() => {
+      if (hold > 0) {
+        hold -= 1;
+        return;
+      }
+      const next = Math.min(text.length, n + step);
+      // A short beat after each sentence, like someone thinking mid-reply.
+      if (/[.!?]\s/.test(text.slice(n, next + 1))) hold = 7;
+      n = next;
+      setShown(n);
+      if (n >= text.length) {
+        clearInterval(t);
+        onDone?.();
+      }
+    }, TYPE_TICK_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, active]);
+
+  useEffect(() => {
+    onGrow?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
+  const typing = active && shown < text.length;
+  return (
+    <>
+      {text.slice(0, shown)}
+      {typing && <span className="chat-caret" aria-hidden="true" />}
+    </>
+  );
+}
+
 export function Home() {
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   return (
@@ -83,10 +141,12 @@ function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  useEffect(() => {
+  function scrollToEnd() {
     const el = scroller.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, sending]);
+  }
+
+  useEffect(scrollToEnd, [messages, sending]);
 
   async function send(text = draft) {
     const message = text.trim();
@@ -94,14 +154,15 @@ function Chat() {
     setDraft('');
     setError(null);
     setSending(true);
-    setMessages((m) => [...m, { role: 'user', text: message }]);
+    // Sending cuts short a reply still being typed out.
+    setMessages((m) => [...m.map((x) => (x.typing ? { ...x, typing: false } : x)), { role: 'user', text: message }]);
     try {
       const res = await client.olaf.chat({ message, conversationId });
       if (res.conversationId !== conversationId) {
         setConversationId(res.conversationId);
         writeConversationId(res.conversationId);
       }
-      setMessages((m) => [...m, { role: 'olaf', text: res.reply || '…' }]);
+      setMessages((m) => [...m, { role: 'olaf', text: res.reply || '…', typing: true }]);
     } catch (err) {
       setMessages((m) => m.slice(0, -1));
       setDraft(message);
@@ -152,11 +213,28 @@ function Chat() {
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`bubble ${m.role === 'user' ? 'bubble--user' : 'bubble--assistant'}`}>
-              {m.text}
+              {m.role === 'olaf' ? (
+                <TypedText
+                  text={m.text}
+                  active={Boolean(m.typing)}
+                  onGrow={scrollToEnd}
+                  onDone={() => setMessages((ms) => ms.map((x, j) => (j === i ? { ...x, typing: false } : x)))}
+                />
+              ) : (
+                m.text
+              )}
             </div>
           ))
         )}
-        {sending && <div className="bubble bubble--assistant bubble--thinking">Thinking…</div>}
+        {sending && (
+          <div className="bubble bubble--assistant bubble--thinking" aria-label="Olaf is typing">
+            <span className="typing-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          </div>
+        )}
       </div>
 
       {error && (

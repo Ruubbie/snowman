@@ -168,7 +168,7 @@ export function workoutFor(date, settings) {
   return {
     kind: 'walk',
     title: 'Recovery walk',
-    summary: '25 min brisk recovery walk.',
+    summary: '25 min recovery walk, a bit quicker than a stroll.',
     segments: [{ kind: 'walk', seconds: RECOVERY_WALK_S }],
     programWeek,
   };

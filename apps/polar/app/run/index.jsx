@@ -7,6 +7,8 @@ import { tokenStore } from '../../src/lib/tokenStore.js';
 import { getClient } from '../../src/lib/client.js';
 import { setPendingRun } from '../../src/lib/pendingRun.js';
 import { formatDistance, formatPace } from '../../src/lib/format.js';
+// No extension: Metro picks LiveMap.web.jsx in the browser simulator.
+import { LiveMap } from '../../src/components/LiveMap';
 
 function fmt(s) {
   const v = Math.max(0, Math.round(s));
@@ -38,6 +40,8 @@ export default function Run() {
   const [toastVisible, setToastVisible] = useState(false);
   const [locked, setLocked] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [route, setRoute] = useState([]); // accepted GPS fixes, for the map
   // Blocking problem that makes real tracking impossible (never fall back to fake data).
   const [trackerError, setTrackerError] = useState(tracker.unavailableReason);
   const startedRef = useRef(false);
@@ -69,7 +73,10 @@ export default function Run() {
         }
         setRunState(s.state);
       });
-      gpsSub = tracker.addListener('gps', (g) => setGpsAccuracy(g.accuracy_m));
+      gpsSub = tracker.addListener('gps', (g) => {
+        setGpsAccuracy(g.accuracy_m);
+        if (g.on_route && g.lat != null) setRoute((r) => [...r, { lat: g.lat, lon: g.lon }]);
+      });
       clipsSub = tracker.addListener('clips', setClips);
 
       if (sessionId && !brief) {
@@ -159,9 +166,26 @@ export default function Run() {
             ) : (
               <Badge tone="solid">Live</Badge>
             )}
-            <IconButton icon="map" variant="plain" label="Map" disabled={locked} />
+            <IconButton
+              icon={showMap ? 'timer' : 'map'}
+              variant={showMap ? 'solid' : 'plain'}
+              label={showMap ? 'Show timer' : 'Show map'}
+              onPress={() => setShowMap((m) => !m)}
+              disabled={locked}
+            />
           </View>
 
+          {showMap ? (
+            <View style={{ alignSelf: 'stretch', marginTop: 20, marginHorizontal: -24 }}>
+              <LiveMap route={route} height={300} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 12 }}>
+                <Text variant="dataMedium" muted>
+                  {isInterval ? `${seg.kind === 'walk' ? 'Walk' : 'Run'} · ${fmt(remainingS)} left` : `${fmt(snapshot.elapsed_s)} elapsed`}
+                </Text>
+                <Text variant="dataMedium" muted>{isReady ? gpsLabel(gpsAccuracy) : `${km.toFixed(2)} km`}</Text>
+              </View>
+            </View>
+          ) : (
           <View style={{ width: 280, height: 280, marginTop: 34 }}>
             <Ring size={280} weight={10} progress={isInterval ? segProgress : Math.min(1, km / 5)}>
               {isInterval ? (
@@ -189,8 +213,9 @@ export default function Run() {
               )}
             </Ring>
           </View>
+          )}
 
-          {isInterval && (
+          {isInterval && !showMap && (
             <View style={{ marginTop: 20 }}>
               <DashPager count={segments.length} index={segIndex} />
             </View>
