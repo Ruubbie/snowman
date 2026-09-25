@@ -131,11 +131,12 @@ without a database).
 
 `apps/ios` is a native SwiftUI app. It's built from Windows: GitHub Actions
 (`.github/workflows/olaf-ios.yml`) generates the Xcode project with XcodeGen
-and builds an unsigned `Olaf.ipa`, and SideStore signs and installs it.
+and builds `Olaf.ipa`. Install it from the PC with [Impactor](https://github.com/claration/Impactor)
+(free Apple ID, re-install every 7 days). SideStore and Sideloadly drop the HealthKit entitlement; Impactor keeps it.
 
 1. Push a change under `apps/ios/**` to `main` (or run "Olaf iOS build" by hand in Actions).
-2. Open the **`olaf-latest`** release in Safari on the iPhone and download `Olaf.ipa`.
-3. SideStore: My Apps > `+` > pick the IPA.
+2. Download `Olaf.ipa` from the **`olaf-latest`** release on the PC.
+3. Plug in the iPhone, open the IPA in Impactor and install with your Apple ID; trust it under Settings > General > VPN & Device Management.
 4. Get a pairing code on the server (valid 10 minutes), then enter `olaf.ruubbie.nl` and the code in the app:
    ```bash
    ssh -i ~/Documents/ssh-key-2026-08-29.key ubuntu@92.5.233.11 "cd /opt/snowman/apps/backbone && sudo -u snowman node --env-file=/opt/snowman/.env scripts/pair.js iPhone"

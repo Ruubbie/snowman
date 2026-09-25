@@ -1,6 +1,6 @@
 name: Olaf iOS build
 
-# Unsigned IPA; SideStore signs and installs it on the phone. No Mac needed.
+# Unsigned IPA; Impactor signs and installs it from the PC (it keeps HealthKit). No Mac needed.
 on:
   push:
     paths: ['apps/ios/**', '.github/workflows/olaf-ios.yml']
@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/Olaf.app Payload/
-          # Unsigned builds carry no entitlements; embed them ad hoc so SideStore keeps HealthKit.
+          # Unsigned builds carry no entitlements; embed them ad hoc so the sideloader can keep HealthKit.
           codesign --force --sign - --entitlements Olaf/Olaf.entitlements Payload/Olaf.app
           zip -qry Olaf.ipa Payload
 
@@ -52,4 +52,4 @@ jobs:
           gh release delete olaf-latest -y --cleanup-tag || true
           gh release create olaf-latest Olaf.ipa --target ${{ github.sha }} \
             --title "Olaf build ${{ github.run_number }}" \
-            --notes "Open this page in Safari on your iPhone, download Olaf.ipa and install it with SideStore."
+            --notes "Download Olaf.ipa and install it with Impactor from the PC."
