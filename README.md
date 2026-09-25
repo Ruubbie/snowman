@@ -136,5 +136,12 @@ and builds an unsigned `Olaf.ipa`, and SideStore signs and installs it.
 1. Push a change under `apps/ios/**` to `main` (or run "Olaf iOS build" by hand in Actions).
 2. Open the **`olaf-latest`** release in Safari on the iPhone and download `Olaf.ipa`.
 3. SideStore: My Apps > `+` > pick the IPA.
-4. On the PC: `npm run pair -- iPhone`, then enter the PC's LAN address
-   (e.g. `192.168.1.10:4000`) and the code in the app. Allow local network access.
+4. Get a pairing code on the server (valid 10 minutes), then enter `olaf.ruubbie.nl` and the code in the app:
+   ```bash
+   ssh -i ~/Documents/ssh-key-2026-08-29.key ubuntu@92.5.233.11 "cd /opt/snowman/apps/backbone && sudo -u snowman node --env-file=/opt/snowman/.env scripts/pair.js iPhone"
+   ```
+
+## Deploy
+
+The server (`olaf.ruubbie.nl`, 92.5.233.11, nginx + Let's Encrypt in front of port 4000) runs a checkout in `/opt/snowman`
+as the `snowman` systemd service. To update: `git pull` there as `snowman`, `npm ci --omit=dev --workspace @snowman/backbone --include-workspace-root`, `sudo systemctl restart snowman`.

@@ -65,7 +65,7 @@ enum OlafError: LocalizedError {
 enum OlafAPI {
     static func normalize(_ input: String) throws -> URL {
         var s = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !s.contains("://") { s = "http://" + s }
+        if !s.contains("://") { s = "https://" + s }
         while s.hasSuffix("/") { s.removeLast() }
         guard let url = URL(string: s), url.host != nil else { throw OlafError.badURL }
         return url

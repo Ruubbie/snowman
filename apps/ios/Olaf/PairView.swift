@@ -11,7 +11,7 @@ struct PairView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("192.168.1.10:4000", text: $server)
+                    TextField("olaf.ruubbie.nl", text: $server)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -19,7 +19,7 @@ struct PairView: View {
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                 } footer: {
-                    Text("Get a code on the server: npm run pair -- iPhone")
+                    Text("Get a pairing code on the server (see the README).")
                 }
                 Section {
                     Button(busy ? "Pairing…" : "Pair") { Task { await pair() } }
