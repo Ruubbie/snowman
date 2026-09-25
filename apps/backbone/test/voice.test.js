@@ -353,28 +353,6 @@ function fakeBrain(json) {
   };
 }
 
-test('POST /v1/running/cue returns audio immediately and the audio url waits for synthesis', async () => {
-  const { engine, stats } = makeEngine({ delayMs: 30 });
-  const runningRepo = { async getRecentCues() { return []; }, async insertCue() {} };
-  const app = testApp({ voice: engine, brain: fakeBrain({ say: 'Ease off a little, 6:10/km is plenty.' }), runningRepo });
-
-  const res = await app.inject({
-    method: 'POST',
-    url: '/v1/running/cue',
-    headers: AUTH,
-    payload: { runClientId: 'run-1', trigger: 'too_fast', snapshot: { elapsed_s: 60 } },
-  });
-  assert.equal(res.statusCode, 200);
-  const { say, audio } = res.json();
-  assert.equal(say, 'Ease off a little, 6:10/km is plenty.');
-  assert.equal(audio.id, engine.idFor(say));
-
-  const clip = await app.inject({ method: 'GET', url: audio.url, headers: AUTH });
-  assert.equal(clip.statusCode, 200);
-  assert.equal(stats.calls.length, 1);
-  assert.match(stats.calls[0], /six ten per kilometre/);
-});
-
 test('POST /v1/running/brief returns deterministic audio ids for the spoken lines', async () => {
   const { engine, stats } = makeEngine();
   const brief = {

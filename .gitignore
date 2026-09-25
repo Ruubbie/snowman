@@ -6,14 +6,14 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 coverage/
-apps/polar/dist/
-apps/polar/.expo/
-apps/polar/web-build/
 
 # local tool settings and native prebuild output
 .claude/
-apps/polar/ios/
-apps/polar/android/
 
 # desktop renderer build output
 apps/desktop/dist/
+
+# iOS app: XcodeGen output and build products
+apps/ios/Olaf.xcodeproj/
+apps/ios/Olaf/Info.plist
+apps/ios/build/

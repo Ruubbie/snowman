@@ -3,8 +3,8 @@
 Snowman is a personal AI backbone that runs locally (for now) and hosts
 **Olaf**, an AI character built on the Claude API. This repo is step 1: a
 monorepo skeleton, the Node backbone (Fastify + MariaDB), a running-coach
-module, and Olaf's brain core. There is no UI yet - everything is driven by
-HTTP/WebSocket and `curl`.
+module, Olaf's brain core, and a browser dashboard (`apps/desktop`).
+Direction and build order: [docs/olaf-plan.md](docs/olaf-plan.md).
 
 ## Repo layout
 
@@ -25,11 +25,10 @@ packages/shared/          @snowman/shared - event names, card kinds, pace/durati
 packages/modules/running/ @snowman/module-running - the 8-week run/walk program, plan rules,
                            the old-app import parser, run analysis, routes, and Olaf tools
 
-FUTURE (not built yet):
-apps/snowball/            Expo iPhone app - the actual running tracker UI
-apps/olaf/                 a dedicated Olaf-facing surface, if it ends up separate from the backbone
-apps/desktop/               Electron overlay for Olaf on the desktop
-native/ios/                 native iOS glue for Snowball, if Expo isn't enough
+apps/desktop/             browser dashboard: view and delete everything Olaf collected
+
+NEXT (see docs/olaf-plan.md):
+apps/ios/                 native SwiftUI Olaf app: HealthKit in, WorkoutKit out, App Intents
 ```
 
 ## Local setup (Windows)
@@ -111,8 +110,8 @@ Ports the old Swift app's 8-week run/walk-to-30-minutes program. See
 `rules.js` for the plan guardrails (rest days, consecutive-run limits, the
 10% weekly increase cap). Uploaded runs can carry rich ~1Hz GPS/motion
 telemetry (`run_samples`/`run_events`) - the schema is documented as a
-tracker contract in `packages/shared/src/runningTelemetry.js`, for the
-future Swift Snowball tracker to implement. `analysis.js` turns that
+tracker contract in `packages/shared/src/runningTelemetry.js`, ; the
+Olaf iPhone app will upload HealthKit workouts through it. `analysis.js` turns that
 telemetry into splits, elevation, pace-over-time, and segment performance,
 pure-function style, with no DB access.
 
@@ -128,29 +127,14 @@ test runner. Tests that need a real MariaDB are skipped unless
 is written as pure functions or repo-fake-friendly modules so it's testable
 without a database).
 
-## Polar on your iPhone
+## Olaf on your iPhone
 
-Polar (the running app) has no Mac in the loop: GitHub Actions builds an
-unsigned `.ipa` on `macos-15` and SideStore signs/installs it on your phone.
+`apps/ios` is a native SwiftUI app. It's built from Windows: GitHub Actions
+(`.github/workflows/olaf-ios.yml`) generates the Xcode project with XcodeGen
+and builds an unsigned `Olaf.ipa`, and SideStore signs and installs it.
 
-1. **Push to `main`** (or run the workflow manually: Actions > "Polar iOS
-   build" > Run workflow). Any change under `apps/polar/**` or `packages/**`
-   triggers it automatically.
-2. **Wait for the build**, then open the **`polar-latest`** release on
-   GitHub - either in the Actions run summary or under Releases. Open it
-   **in Safari on your iPhone** and download `Polar.ipa`.
-3. **Install it with SideStore**: My Apps > `+` > pick the downloaded IPA
-   from Files. SideStore signs it with your Apple ID and installs it,
-   same as the RunCoach build it replaces.
-4. **On first launch**, allow the location, motion, and notification
-   permission prompts - the run tracker, cadence/elevation sensors, and
-   Live Activity all need them to work.
-
-Until the backbone runs on the Oracle server, the phone can only reach
-Olaf while both devices are on the same Wi-Fi (fetch today's brief at home,
-so the phone can reach the PC's LAN IP). Once you head out the door without
-Wi-Fi, the run itself still works fully offline: GPS, splits, cadence, the
-Live Activity, and Olaf's brief-provided fallback lines all keep announcing
-segment switches and splits. You just won't get live, freshly-generated
-Olaf lines mid-run until either the backbone is reachable (same Wi-Fi) or
-it's deployed to the public Oracle server.
+1. Push a change under `apps/ios/**` to `main` (or run "Olaf iOS build" by hand in Actions).
+2. Open the **`olaf-latest`** release in Safari on the iPhone and download `Olaf.ipa`.
+3. SideStore: My Apps > `+` > pick the IPA.
+4. On the PC: `npm run pair -- iPhone`, then enter the PC's LAN address
+   (e.g. `192.168.1.10:4000`) and the code in the app. Allow local network access.

@@ -326,20 +326,6 @@ export function createRunningRepo(pool) {
         [sessionId, JSON.stringify(brief), model, inputHash],
       );
     },
-    async insertCue(cue) {
-      await pool.query(
-        `INSERT INTO run_cues (run_client_id, session_id, elapsed_s, trigger_type, text, source, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))`,
-        [cue.runClientId, cue.sessionId ?? null, cue.elapsedS, cue.trigger, cue.text ?? null, cue.source],
-      );
-    },
-    async getRecentCues(runClientId, limit = 3) {
-      const [rows] = await pool.query(
-        'SELECT text FROM run_cues WHERE run_client_id = ? ORDER BY id DESC LIMIT ?',
-        [runClientId, limit],
-      );
-      return rows.map((r) => r.text).filter(Boolean);
-    },
     async insertPlanDecision(decision) {
       await pool.query(
         `INSERT INTO plan_decisions (at, actor, action, reason, before_state, after_state) VALUES (?, ?, ?, ?, ?, ?)`,

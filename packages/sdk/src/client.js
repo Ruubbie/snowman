@@ -66,8 +66,6 @@ export function createClient({ baseUrl, getToken, fetchImpl }) {
     analysis: (id) => request(`/v1/running/runs/${encodeURIComponent(id)}/analysis`),
     samples: (id, { every } = {}) => request(`/v1/running/runs/${encodeURIComponent(id)}/samples`, { query: { every } }),
     brief: (sessionId) => request('/v1/running/brief', { method: 'POST', body: { sessionId } }),
-    cue: ({ sessionId = null, runClientId, trigger, snapshot }) =>
-      request('/v1/running/cue', { method: 'POST', body: { sessionId, runClientId, trigger, snapshot } }),
     debrief: (runId) => request(`/v1/running/debrief/${encodeURIComponent(runId)}`, { method: 'POST' }),
     uploadRun: ({ run, samples = [], events = [] }) =>
       request('/v1/running/runs', { method: 'POST', body: { run, samples, events } }),

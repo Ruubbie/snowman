@@ -8,7 +8,7 @@ import { analyzeRun } from './analysis.js';
 
 const BODY_LIMIT_20MB = 20 * 1024 * 1024;
 
-/** How Olaf talks out loud during a workout; shared by the brief and live cues. */
+/** How Olaf talks out loud during a workout; used by the brief. */
 const SPOKEN_STYLE = `How it has to sound:
 - Spoken, not written. You're jogging along in their ear, so talk like it: short sentences, contractions, plain words. Most in-run lines are 3 to 12 words; some are just two or three.
 - Numbers the way people say them, in words: "about seven minutes a kilometre", "four minutes", "the last one". Round paces to the nearest half minute. Never a range like "6:30 to 7:30", never "per km", never digits.
@@ -31,10 +31,6 @@ ${SPOKEN_STYLE}
   `"Tuesday") or specific past runs.
 
 Return only the requested JSON.`;
-const STABLE_CUE_INSTRUCTIONS =
-  'You are Olaf, speaking a short live cue out loud to a beginner runner mid-run, on an iPhone with no ' +
-  `heart-rate data.\n\n${SPOKEN_STYLE}\n- Never repeat a recent cue or its idea.\n\n` +
-  'Return only the requested JSON; say may be null to stay silent.';
 const STABLE_DEBRIEF_INSTRUCTIONS =
   'You are Olaf, giving a short honest debrief right after a run, to a beginner runner on an iPhone with no ' +
   'heart-rate data. Use the running tools if you need more plan context.';
@@ -240,15 +236,6 @@ export function briefLines(brief) {
   return [...new Set(all.filter((t) => typeof t === 'string' && t.trim()))];
 }
 
-function buildCuePrompt(trigger, snapshot, recentCues) {
-  return [
-    `Trigger: ${trigger}`,
-    `Snapshot: ${JSON.stringify(snapshot)}`,
-    `Recent cues already said (don't repeat): ${JSON.stringify(recentCues)}`,
-    'Return the required JSON with a single short spoken cue, or null to stay silent.',
-  ].join('\n\n');
-}
-
 function buildDebriefPrompt(run, session, analysis) {
   return [
     `Run: ${JSON.stringify(run)}`,
@@ -300,13 +287,6 @@ const BRIEF_SCHEMA = {
   },
 };
 
-const CUE_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['say'],
-  properties: { say: { type: ['string', 'null'] } },
-};
-
 /**
  * Pre-synthesise the brief's spoken lines in the background (low priority)
  * and return their deterministic audio ids/urls right away. null when the
@@ -330,20 +310,6 @@ export function briefAudio(voice, brief) {
   const clips = Object.fromEntries([...made].map(([text, clip]) => [text, clip.url]));
   return { opening_line: at(brief.opening_line), fallback_lines, clips };
 }
-
-const CUE_TRIGGERS = [
-  'segment_upcoming',
-  'too_fast',
-  'too_slow',
-  'km_split',
-  'slowing',
-  'checkin',
-  'paused',
-  'resumed',
-  'halfway',
-  'finish',
-  'gps_lost',
-];
 
 /** Bump when the brief's shape or prompt changes, so every workout gets rewritten once. */
 const BRIEF_VERSION = 'brief-2';
@@ -649,48 +615,6 @@ export function registerRoutes(app, ctx, shared = createRunningShared(ctx, app.l
         if (ctx.sendOlafError(reply, err)) return reply;
         request.log.error({ err }, 'running brief failed');
         return reply.code(500).send({ error: 'internal_error' });
-      }
-    },
-  );
-
-  app.post(
-    '/v1/running/cue',
-    {
-      schema: {
-        body: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['runClientId', 'trigger', 'snapshot'],
-          properties: {
-            sessionId: { type: ['string', 'null'] },
-            runClientId: { type: 'string' },
-            trigger: { type: 'string', enum: CUE_TRIGGERS },
-            snapshot: { type: 'object' },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const { sessionId = null, runClientId, trigger, snapshot } = request.body;
-      if (!ctx.brain.available) return reply.code(503).send({ error: 'olaf_unavailable' });
-
-      const recentCues = await repo.getRecentCues(runClientId, 3);
-      const systemBlocks = ctx.brainAgent.buildSystemBlocks(ctx.persona, STABLE_CUE_INSTRUCTIONS, clock, tzName);
-      const prompt = buildCuePrompt(trigger, snapshot, recentCues);
-
-      try {
-        const { data } = await ctx.brainAgent.structured(
-          { brain: ctx.brain, budget: ctx.budget, purpose: 'running.cue' },
-          { model: ctx.config.olafModelFast, systemBlocks, messages: [{ role: 'user', content: prompt }], maxTokens: 150 },
-          CUE_SCHEMA,
-        );
-        await repo.insertCue({ runClientId, sessionId, elapsedS: snapshot.elapsed_s ?? 0, trigger, text: data.say, source: 'live' });
-        // Queued ahead of any brief pre-synthesis; the client's GET on audio.url waits for it.
-        return { say: data.say, audio: data.say ? (ctx.voice?.enqueue(data.say, { priority: 'high' }) ?? null) : null };
-      } catch (err) {
-        await repo.insertCue({ runClientId, sessionId, elapsedS: snapshot.elapsed_s ?? 0, trigger, text: null, source: 'fallback' });
-        if (ctx.sendOlafError(reply, err)) return reply;
-        return { say: null, audio: null };
       }
     },
   );

@@ -124,27 +124,6 @@ test('fetch throwing wraps into NetworkError', async () => {
   await assert.rejects(() => client.running.today(), NetworkError);
 });
 
-test('running.cue posts trigger/snapshot/runClientId', async () => {
-  let seen;
-  const client = createClient({
-    baseUrl: 'http://127.0.0.1:4000',
-    getToken: () => 'tok',
-    fetchImpl: fakeFetch((url, opts) => {
-      seen = { url, opts };
-      return jsonResponse(200, { say: 'Nice pace!' });
-    }),
-  });
-  const res = await client.running.cue({ runClientId: 'run-1', trigger: 'km_split', snapshot: { elapsed_s: 300 } });
-  assert.equal(res.say, 'Nice pace!');
-  assert.equal(seen.url, 'http://127.0.0.1:4000/v1/running/cue');
-  assert.deepEqual(JSON.parse(seen.opts.body), {
-    sessionId: null,
-    runClientId: 'run-1',
-    trigger: 'km_split',
-    snapshot: { elapsed_s: 300 },
-  });
-});
-
 test('running.settings PUTs to /v1/running/settings', async () => {
   let seen;
   const client = createClient({

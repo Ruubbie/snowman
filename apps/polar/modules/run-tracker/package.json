@@ -1,9 +1,0 @@
-{
-  "name": "run-tracker",
-  "version": "1.0.0",
-  "type": "module",
-  "description": "Native run tracker (GPS, motion, voice cues, Live Activity) for Polar.",
-  "main": "index.js",
-  "license": "UNLICENSED",
-  "private": true
-}

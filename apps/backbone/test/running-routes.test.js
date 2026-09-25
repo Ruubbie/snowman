@@ -35,11 +35,9 @@ function fakeBudget() {
 function fakeRunningRepo() {
   const sessions = new Map();
   const briefs = new Map();
-  const cues = [];
   return {
     sessions,
     briefs,
-    cues,
     async getSessionById(id) {
       return sessions.get(id) || null;
     },
@@ -63,12 +61,6 @@ function fakeRunningRepo() {
     },
     async getSessionsBetween(from, to) {
       return [...sessions.values()].filter((x) => x.date >= from && x.date <= to).sort((a, b) => a.date.localeCompare(b.date));
-    },
-    async insertCue(cue) {
-      cues.push(cue);
-    },
-    async getRecentCues() {
-      return [];
     },
   };
 }
@@ -231,57 +223,9 @@ test('POST /v1/running/brief returns 503 olaf_unavailable when Olaf has no API k
   assert.equal(response.json().error, 'olaf_unavailable');
 });
 
-test('POST /v1/running/cue returns a short structured spoken cue and logs it as "live"', async () => {
-  const runningRepo = fakeRunningRepo();
-  const brain = fakeBrainWith({
-    stop_reason: 'end_turn',
-    content: [{ type: 'text', text: JSON.stringify({ say: 'Nice pace, keep it up!' }) }],
-    usage: {},
-  });
-
-  const app = buildTestApp({ brain, runningRepo });
-  const response = await app.inject({
-    method: 'POST',
-    url: '/v1/running/cue',
-    headers: { authorization: `Bearer ${TEST_TOKEN}` },
-    payload: { runClientId: 'run-1', trigger: 'checkin', snapshot: { elapsed_s: 120 } },
-  });
-
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.json().say, 'Nice pace, keep it up!');
-  assert.equal(runningRepo.cues.length, 1);
-  assert.equal(runningRepo.cues[0].source, 'live');
-  assert.equal(runningRepo.cues[0].trigger, 'checkin');
-
-  // Fast tier (haiku) must never receive a thinking parameter (checked at the API-call level in agent.test.js).
-});
-
-test('POST /v1/running/cue falls back and logs a "fallback" cue when Olaf refuses', async () => {
-  const runningRepo = fakeRunningRepo();
-  const brain = {
-    available: true,
-    async createMessage() {
-      return { stop_reason: 'refusal', stop_details: { category: 'other' }, content: [], usage: {} };
-    },
-  };
-
-  const app = buildTestApp({ brain, runningRepo });
-  const response = await app.inject({
-    method: 'POST',
-    url: '/v1/running/cue',
-    headers: { authorization: `Bearer ${TEST_TOKEN}` },
-    payload: { runClientId: 'run-2', trigger: 'too_fast', snapshot: { elapsed_s: 30 } },
-  });
-
-  assert.equal(response.statusCode, 422);
-  assert.equal(runningRepo.cues.length, 1);
-  assert.equal(runningRepo.cues[0].source, 'fallback');
-  assert.equal(runningRepo.cues[0].text, null);
-});
-
 test('running routes require a Bearer token', async () => {
   const app = buildTestApp({ brain: fakeBrainWith({}), runningRepo: fakeRunningRepo() });
-  const response = await app.inject({ method: 'POST', url: '/v1/running/cue', payload: {} });
+  const response = await app.inject({ method: 'GET', url: '/v1/running/today' });
   assert.equal(response.statusCode, 401);
 });
 

@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export const DEV_PORT = 5178;
 
 /**
- * Browser-dev only: lets the renderer run in a normal browser (no Electron)
+ * Lets the dashboard run in a normal browser
  * by forwarding API calls to the backbone server-side, so the backbone's
  * CORS list doesn't need to know about this dev server. The target comes from
  * the X-Snowman-Target header (http/https only, /v1/ paths only).
@@ -61,7 +61,7 @@ function productionCsp() {
 }
 
 export default defineConfig({
-  base: './', // the built renderer is loaded from file:// by Electron
+  base: './',
   plugins: [react(), browserDevProxy(), productionCsp()],
   server: { port: DEV_PORT, strictPort: true, host: '127.0.0.1' },
   build: { outDir: 'dist', emptyOutDir: true, target: 'chrome140' },

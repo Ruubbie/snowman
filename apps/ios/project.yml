@@ -1,0 +1,32 @@
+name: Olaf
+options:
+  bundleIdPrefix: nl.ruben
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  Olaf:
+    type: application
+    platform: iOS
+    sources: [Olaf]
+    scheme: {}
+    info:
+      path: Olaf/Info.plist
+      properties:
+        CFBundleDisplayName: "olaf"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSLocalNetworkUsageDescription: "Olaf talks to your own Snowman server on your home network."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.ruben.olaf
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: NO

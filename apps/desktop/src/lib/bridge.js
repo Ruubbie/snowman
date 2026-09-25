@@ -1,11 +1,7 @@
-// One interface, two shells:
-// - Electron: window.snowman from electron/preload.js. The token lives in the
-//   main process (encrypted with safeStorage) and requests go through IPC.
-// - Browser dev (`npm run dev:web`): a DEV-ONLY store in localStorage and a
-//   Vite middleware proxy, so the renderer can be checked in a normal browser.
+// The dashboard runs in a browser (`npm run dev`): the token is kept in
+// localStorage and requests go through a Vite middleware proxy.
 
 const DEV_KEY = 'snowman.desktop.devStore';
-const desktop = typeof window !== 'undefined' ? window.snowman : undefined;
 
 function readDev() {
   try {
@@ -106,4 +102,4 @@ const browserBridge = {
   },
 };
 
-export const bridge = desktop || browserBridge;
+export const bridge = browserBridge;
